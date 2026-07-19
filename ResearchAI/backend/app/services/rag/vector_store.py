@@ -179,15 +179,32 @@ class VectorStoreService:
 
         query_filter = Filter(must=must_conditions) if must_conditions else None
 
-        results = await c.search(
-            collection_name=COLLECTION_NAME,
-            query_vector=query_vector,
-            limit=top_k,
-            query_filter=query_filter,
-            score_threshold=score_threshold,
-            with_payload=True,
-        )
-        return results
+        try:
+            if hasattr(c, "query_points"):
+                res = await c.query_points(
+                    collection_name=COLLECTION_NAME,
+                    query=query_vector,
+                    limit=top_k,
+                    query_filter=query_filter,
+                    score_threshold=score_threshold,
+                    with_payload=True,
+                )
+                return getattr(res, "points", [])
+            elif hasattr(c, "search"):
+                return await c.search(
+                    collection_name=COLLECTION_NAME,
+                    query_vector=query_vector,
+                    limit=top_k,
+                    query_filter=query_filter,
+                    score_threshold=score_threshold,
+                    with_payload=True,
+                )
+            else:
+                logger.warning("Qdrant client has neither query_points nor search method")
+                return []
+        except Exception as exc:
+            logger.warning("Vector store search error: %s", exc)
+            return []
 
     async def get_collection_info(self) -> dict[str, Any]:
         c = await self.client()
