@@ -1,0 +1,105 @@
+/* Satoshi Font - from OkyAI reference design */
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Black.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --font-satoshi: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+  --background: #0d0a1d;
+  --primary: #a855f7;
+  --sidebar-primary: #d946ef;
+  --sidebar-foreground: #a855f7;
+  --sidebar-accent: rgba(255, 255, 255, 0.2);
+  --sidebar-accent-foreground: #ffffff;
+  --text-primary: #f5f3ff;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-satoshi);
+  background-color: var(--background);
+  background-image: url('/assets/saas-bg-BWWvkdaI.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* SVG Corner Curves from Template */
+.svg-corner path {
+  fill: #a855f7 !important;
+}
+
+.svg-pink path {
+  fill: #d946ef !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { display: none !important; }
+
+/* Hands Loader Keyframes */
+@keyframes slide-in-top-right {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(0); }
+}
+@keyframes slide-in-bottom-left {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(0); }
+}
+@keyframes fade-out-loader {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.animate-slide-top-right {
+  animation: slide-in-top-right 1.5s cubic-bezier(0.43, 0.13, 0.23, 0.96) forwards;
+}
+
+.animate-slide-bottom-left {
+  animation: slide-in-bottom-left 1.5s cubic-bezier(0.43, 0.13, 0.23, 0.96) forwards;
+}
+
+.animate-fade-out {
+  animation: fade-out-loader 0.5s ease-out forwards;
+}

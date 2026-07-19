@@ -1,0 +1,81 @@
+# =============================================================================
+# ResearchMind AI — .gitignore
+# =============================================================================
+
+# ── SECRETS & ENV ────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+*.pem
+*.key
+
+# ── PYTHON VIRTUAL ENVIRONMENT ───────────────────────────────────────────────
+backend/venv/
+backend/.venv/
+venv/
+.venv/
+
+# ── PYTHON CACHE & BUILD ─────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# ── UPLOADED FILES (never commit user data) ──────────────────────────────────
+backend/uploads/
+backend/qdrant_storage/
+backend/data/
+*.pdf
+
+# ── ML MODEL CACHES ──────────────────────────────────────────────────────────
+backend/.model_cache/
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+
+# ── LOCAL TEST / DEBUG SCRIPTS ───────────────────────────────────────────────
+backend/test_*.py
+backend/debug_*.py
+
+# ── DATABASES & LOGS ─────────────────────────────────────────────────────────
+*.sqlite
+*.db
+*.log
+logs/
+
+# ── NODE / NEXT.JS ───────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-error.log*
+
+# ── TYPESCRIPT BUILD ─────────────────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
+
+# ── DOCKER DATA VOLUMES ──────────────────────────────────────────────────────
+postgres_data/
+qdrant_data/
+
+# ── IDE / EDITOR ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
