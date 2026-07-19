@@ -1,5 +1,0 @@
-{
-  "buildCommand": "cd ResearchAI/frontend && npm install && npm run build",
-  "outputDirectory": "ResearchAI/frontend/.next",
-  "framework": "nextjs"
-}
