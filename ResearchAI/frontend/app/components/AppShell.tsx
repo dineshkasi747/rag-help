@@ -45,10 +45,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <Sidebar />
 
       {/* Main Container Inset */}
-      <div data-slot="sidebar-inset" className="relative flex w-full flex-1 flex-col pl-0 xl:pl-24 z-10 min-h-screen">
+      <div data-slot="sidebar-inset" className="relative flex w-full flex-1 flex-col pl-20 sm:pl-24 z-10 min-h-screen">
         <TopHeader />
         
-        <main className="flex-1 flex flex-col max-w-7xl mx-auto w-full p-4 md:p-6 lg:p-8">
+        <main className="flex-1 flex flex-col max-w-7xl mx-auto w-full p-2 sm:p-4 md:p-6 lg:p-8">
           {children}
         </main>
       </div>

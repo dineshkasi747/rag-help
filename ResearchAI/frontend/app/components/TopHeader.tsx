@@ -7,7 +7,7 @@ export default function TopHeader() {
   const { user } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center gap-4 bg-gradient-to-r from-[#a855f7] via-[#9333ea] to-[#d946ef] backdrop-blur-md mx-5 md:mx-10 rounded-b-2xl px-4 md:px-6 shadow-xl">
+    <header className="sticky top-0 z-50 flex h-14 sm:h-16 items-center gap-2 sm:gap-4 bg-gradient-to-r from-[#a855f7] via-[#9333ea] to-[#d946ef] backdrop-blur-md mx-2 sm:mx-4 md:mx-10 rounded-b-2xl px-3 sm:px-6 shadow-xl">
       {/* SVG Curved Corners */}
       <div className="absolute w-full h-full rounded-l-2xl top-0 left-0 pointer-events-none">
         <svg className="absolute left-[-30px] top-0 svg-corner rotate-90" width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">

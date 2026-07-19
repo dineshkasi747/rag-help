@@ -32,8 +32,7 @@ export default function Sidebar() {
   return (
     <aside 
       data-slot="sidebar-container" 
-      className="fixed inset-y-0 z-50 flex w-24 flex-col justify-between items-center transition-all duration-200 left-0 bg-transparent select-none"
-      style={{ "--sidebar-width": "6rem" } as React.CSSProperties}
+      className="fixed inset-y-0 z-50 flex w-20 sm:w-24 flex-col justify-between items-center transition-all duration-200 left-0 bg-transparent select-none"
     >
       <div data-sidebar="sidebar" data-slot="sidebar-inner" className="flex min-h-screen justify-between items-center w-full flex-col py-3">
         {/* Sidebar Header Logo */}
