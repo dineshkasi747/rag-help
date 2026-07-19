@@ -13,7 +13,7 @@ import {
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+import { API_URL as API } from "../config";
 
 interface Paper {
   id: number;
