@@ -103,6 +103,20 @@ async def get_paper_summary(paper_id: int, service: PaperService = Depends(_get_
     return await service.generate_paper_summary(paper_id)
 
 
+@router.get("/{paper_id}/visuals")
+async def get_paper_visuals(paper_id: int, service: PaperService = Depends(_get_service)):
+    """
+    Return cached Napkin AI generated visual diagram URLs for a paper.
+    Returns an empty list if visuals have not been generated yet.
+    """
+    paper = await service.get_paper(paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found.")
+    visuals = await service.get_napkin_visuals(paper_id)
+    return {"paper_id": paper_id, "visuals": visuals, "count": len(visuals)}
+
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

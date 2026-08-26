@@ -15,7 +15,11 @@ import {
   FileText, 
   Award, 
   Layers, 
-  BookOpen 
+  BookOpen,
+  Image,
+  ZoomIn,
+  X,
+  RefreshCw
 } from "lucide-react";
 
 import { API_URL as API } from "../../config";
@@ -70,7 +74,16 @@ export default function PaperDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"summary" | "sections">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "sections" | "visuals">("summary");
+
+  // Napkin AI Visuals
+  interface NapkinVisual { url: string; format: string; label: string; }
+  const [visuals, setVisuals] = useState<NapkinVisual[]>([]);
+  const [visualsLoading, setVisualsLoading] = useState(false);
+  const [visualsError, setVisualsError] = useState("");
+  const [fullscreenVisual, setFullscreenVisual] = useState<NapkinVisual | null>(null);
+  const [visualSvgContents, setVisualSvgContents] = useState<Record<string, string>>({});
+
 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -109,6 +122,47 @@ export default function PaperDetailsPage() {
         setSummaryLoading(false);
       });
   }, [id]);
+
+  // Fetch Napkin visuals when AI Visuals tab is opened
+  const fetchVisuals = async () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+    setVisualsLoading(true);
+    setVisualsError("");
+    try {
+      const res = await fetch(`${API}/papers/${id}/visuals`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to load visuals");
+      const data = await res.json();
+      setVisuals(data.visuals || []);
+
+      // Pre-fetch SVG content for inline rendering
+      const svgMap: Record<string, string> = {};
+      await Promise.all(
+        (data.visuals || []).filter((v: NapkinVisual) => v.format === "svg").map(async (v: NapkinVisual) => {
+          try {
+            const svgRes = await fetch(v.url);
+            if (svgRes.ok) {
+              svgMap[v.url] = await svgRes.text();
+            }
+          } catch { /* ignore individual fetch errors */ }
+        })
+      );
+      setVisualSvgContents(svgMap);
+    } catch (err) {
+      setVisualsError("Could not load Napkin AI visuals. They may still be generating.");
+    } finally {
+      setVisualsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "visuals" && visuals.length === 0 && !visualsLoading) {
+      fetchVisuals();
+    }
+  }, [activeTab]);
+
 
   if (loading) {
     return (
@@ -215,7 +269,7 @@ export default function PaperDetailsPage() {
           </div>
         </div>
 
-        {/* Tab Selector: AI Visual Summary vs Extracted Sections */}
+        {/* Tab Selector */}
         <div className="flex border-b border-white/10 gap-4">
           <button
             onClick={() => setActiveTab("summary")}
@@ -238,6 +292,22 @@ export default function PaperDetailsPage() {
           >
             <Layers className="w-4 h-4" />
             Extracted Sections ({sections.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("visuals")}
+            className={`pb-3 text-sm font-bold transition-all flex items-center gap-2 border-b-2 cursor-pointer ${
+              activeTab === "visuals"
+                ? "border-[#a855f7] text-[#d946ef]"
+                : "border-transparent text-white/50 hover:text-white"
+            }`}
+          >
+            <Image className="w-4 h-4" />
+            AI Visuals
+            {visuals.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-black rounded-full bg-gradient-to-r from-[#a855f7] to-[#d946ef] text-white">
+                {visuals.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -392,7 +462,222 @@ export default function PaperDetailsPage() {
             )}
           </div>
         )}
+
+        {/* TAB 3: AI VISUALS (Napkin AI) */}
+        {activeTab === "visuals" && (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2">
+                  <Image className="w-4 h-4 text-[#a855f7]" />
+                  AI-Generated Diagrams · Powered by Napkin AI
+                </p>
+                <p className="text-white/40 text-xs mt-1">
+                  Visual flowcharts and mindmaps auto-generated from this paper&apos;s content.
+                </p>
+              </div>
+              <button
+                onClick={fetchVisuals}
+                disabled={visualsLoading}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${visualsLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>
+
+            {/* Loading Skeletons */}
+            {visualsLoading && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[1, 2].map(i => (
+                  <div key={i} className="animate-pulse space-y-3 bg-slate-900/70 border border-white/10 rounded-3xl p-5">
+                    <div className="h-4 w-40 bg-white/10 rounded-lg" />
+                    <div className="h-64 w-full bg-white/5 rounded-2xl" />
+                    <div className="h-3 w-24 bg-white/10 rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Error State */}
+            {!visualsLoading && visualsError && (
+              <div className="text-center py-16 border border-dashed border-amber-500/30 rounded-3xl bg-amber-500/5">
+                <div className="text-4xl mb-3">⏳</div>
+                <p className="text-amber-300 font-bold text-sm">{visualsError}</p>
+                <p className="text-white/40 text-xs mt-2">
+                  Napkin AI visuals are generated after paper processing completes. Try refreshing in a moment.
+                </p>
+                <button
+                  onClick={fetchVisuals}
+                  className="mt-4 px-5 py-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-all cursor-pointer"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!visualsLoading && !visualsError && visuals.length === 0 && (
+              <div className="text-center py-16 border border-dashed border-white/15 rounded-3xl bg-slate-900/40 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#a855f7]/5 via-transparent to-[#d946ef]/5 pointer-events-none" />
+                <div className="relative z-10">
+                  <div className="w-16 h-16 rounded-2xl bg-[#a855f7]/10 border border-[#a855f7]/20 flex items-center justify-center mx-auto mb-4">
+                    <Image className="w-8 h-8 text-[#a855f7]/50" />
+                  </div>
+                  <p className="text-white font-bold text-base mb-1">No visuals generated yet</p>
+                  <p className="text-white/40 text-xs max-w-xs mx-auto">
+                    Napkin AI diagrams are generated automatically after paper processing. Check back once the paper status is&nbsp;
+                    <span className="text-emerald-400 font-bold">Completed</span>.
+                  </p>
+                  <button
+                    onClick={fetchVisuals}
+                    className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#a855f7] to-[#d946ef] text-white text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-lg"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Check for Visuals
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Visuals Grid */}
+            {!visualsLoading && visuals.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {visuals.map((visual, idx) => (
+                  <div
+                    key={idx}
+                    className="group bg-slate-900/70 border border-white/15 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-xl hover:border-[#a855f7]/50 transition-all duration-300"
+                  >
+                    {/* Card Header */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[#a855f7] to-[#d946ef]" />
+                        <p className="text-xs font-bold text-white truncate max-w-[200px]">
+                          {visual.label}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-lg bg-[#a855f7]/20 border border-[#a855f7]/30 text-[#d946ef] text-[10px] font-extrabold uppercase">
+                          {visual.format}
+                        </span>
+                        <button
+                          onClick={() => setFullscreenVisual(visual)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-[#a855f7]/20 border border-white/10 hover:border-[#a855f7]/40 text-white/50 hover:text-[#d946ef] text-[10px] font-bold transition-all cursor-pointer"
+                        >
+                          <ZoomIn className="w-3 h-3" />
+                          Expand
+                        </button>
+                        <a
+                          href={visual.url}
+                          download
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 text-white/50 hover:text-emerald-400 text-[10px] font-bold transition-all cursor-pointer"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          ↓ Save
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Visual Content */}
+                    <div
+                      className="w-full bg-white/5 flex items-center justify-center min-h-[260px] p-4 cursor-zoom-in"
+                      onClick={() => setFullscreenVisual(visual)}
+                    >
+                      {visual.format === "svg" && visualSvgContents[visual.url] ? (
+                        <div
+                          className="w-full h-full max-h-[500px] overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-h-[480px]"
+                          dangerouslySetInnerHTML={{ __html: visualSvgContents[visual.url] }}
+                        />
+                      ) : (
+                        // Fallback: render as <img> for PNG or if SVG fetch failed
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={visual.url}
+                          alt={visual.label}
+                          className="max-w-full max-h-[480px] rounded-xl object-contain"
+                          onError={e => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
+                      <p className="text-[10px] text-white/30">
+                        Generated by Napkin AI · Click to expand
+                      </p>
+                      <span className="text-[10px] text-white/30">#{idx + 1} of {visuals.length}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Fullscreen Lightbox Modal */}
+      {fullscreenVisual && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4"
+          onClick={() => setFullscreenVisual(null)}
+        >
+          <div
+            className="relative max-w-6xl w-full max-h-[92vh] bg-[#0e0a1f] border border-[#a855f7]/30 rounded-3xl overflow-auto shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-[#0e0a1f]/95 backdrop-blur border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-[#a855f7] to-[#d946ef]" />
+                <p className="text-sm font-bold text-white">{fullscreenVisual.label}</p>
+                <span className="px-2 py-0.5 rounded-lg bg-[#a855f7]/20 border border-[#a855f7]/30 text-[#d946ef] text-[10px] font-extrabold uppercase">
+                  {fullscreenVisual.format}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={fullscreenVisual.url}
+                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#a855f7]/20 border border-[#a855f7]/30 text-[#d946ef] text-xs font-bold hover:bg-[#a855f7]/30 transition-all cursor-pointer"
+                >
+                  ↓ Download {fullscreenVisual.format.toUpperCase()}
+                </a>
+                <button
+                  onClick={() => setFullscreenVisual(null)}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/30 text-white/50 hover:text-red-400 transition-all cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Visual */}
+            <div className="p-6 flex items-center justify-center min-h-[60vh] bg-white/5">
+              {fullscreenVisual.format === "svg" && visualSvgContents[fullscreenVisual.url] ? (
+                <div
+                  className="w-full [&_svg]:w-full [&_svg]:h-auto"
+                  dangerouslySetInnerHTML={{ __html: visualSvgContents[fullscreenVisual.url] }}
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={fullscreenVisual.url}
+                  alt={fullscreenVisual.label}
+                  className="max-w-full max-h-[80vh] rounded-xl object-contain"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
+

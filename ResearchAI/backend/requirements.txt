@@ -18,3 +18,6 @@ alembic>=1.13.0
 anthropic>=0.26.0
 google-generativeai>=0.5.3
 openai>=1.30.1
+
+# Napkin AI visual diagram generation
+httpx>=0.27.0
