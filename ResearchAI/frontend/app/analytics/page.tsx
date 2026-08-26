@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "../components/AppShell";
+import PaperVisualizationStudio from "../components/visuals/PaperVisualizationStudio";
 import { Activity, BarChart3, TrendingUp, Cpu, HardDrive, Zap, RefreshCw, FileText, Layers, Image as ImageIcon } from "lucide-react";
 import { API_URL as API } from "../config";
 
@@ -179,6 +180,15 @@ export default function AnalyticsPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Global Multi-Paradigm Visual Studio */}
+        <div className="space-y-4 pt-4">
+          <PaperVisualizationStudio
+            paperId={4}
+            title="Global Research Corpus"
+            defaultTab="umap"
+          />
         </div>
       </div>
     </AppShell>

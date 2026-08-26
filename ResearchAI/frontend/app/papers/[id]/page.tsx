@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import AppShell from "../../components/AppShell";
+import PaperVisualizationStudio from "../../components/visuals/PaperVisualizationStudio";
 import { 
   ArrowLeft, 
   Sparkles, 
@@ -532,169 +533,14 @@ export default function PaperDetailsPage() {
           </div>
         )}
 
-        {/* TAB 3: AI VISUALS (Napkin AI) */}
+        {/* TAB 3: VISUAL ANALYTICS & RAG STUDIO */}
         {activeTab === "visuals" && (
-          <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2">
-                  <Image className="w-4 h-4 text-[#a855f7]" />
-                  AI-Generated Diagrams · Powered by Napkin AI &amp; SVG Studio
-                </p>
-                <p className="text-white/40 text-xs mt-1">
-                  Visual flowcharts, mindmaps, and architecture diagrams generated from this paper&apos;s content.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={fetchVisuals}
-                  disabled={visualsLoading}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${visualsLoading ? "animate-spin" : ""}`} />
-                  Refresh
-                </button>
-                <button
-                  onClick={handleGenerateVisuals}
-                  disabled={visualsLoading}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] hover:from-[#7C3AED] hover:to-[#C026D3] text-white text-xs font-bold shadow-lg shadow-purple-900/30 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  {visuals.length > 0 ? "Regenerate Visuals" : "Generate Visuals"}
-                </button>
-              </div>
-            </div>
-
-            {/* Loading Skeletons */}
-            {visualsLoading && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[1, 2].map(i => (
-                  <div key={i} className="animate-pulse space-y-3 bg-slate-900/70 border border-white/10 rounded-3xl p-5">
-                    <div className="h-4 w-40 bg-white/10 rounded-lg" />
-                    <div className="h-64 w-full bg-white/5 rounded-2xl" />
-                    <div className="h-3 w-24 bg-white/10 rounded-lg" />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Error State */}
-            {!visualsLoading && visualsError && (
-              <div className="text-center py-16 border border-dashed border-amber-500/30 rounded-3xl bg-amber-500/5">
-                <div className="text-4xl mb-3">⏳</div>
-                <p className="text-amber-300 font-bold text-sm">{visualsError}</p>
-                <p className="text-white/40 text-xs mt-2">
-                  Click Generate Visuals below to synthesize diagrams for this paper.
-                </p>
-                <button
-                  onClick={handleGenerateVisuals}
-                  className="mt-4 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] text-white text-xs font-bold transition-all shadow-md cursor-pointer"
-                >
-                  Generate Visuals Now
-                </button>
-              </div>
-            )}
-
-            {/* Empty State */}
-            {!visualsLoading && !visualsError && visuals.length === 0 && (
-              <div className="text-center py-16 border border-dashed border-white/15 rounded-3xl bg-slate-900/40 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#a855f7]/5 via-transparent to-[#d946ef]/5 pointer-events-none" />
-                <div className="relative z-10">
-                  <div className="w-16 h-16 rounded-2xl bg-[#a855f7]/10 border border-[#a855f7]/20 flex items-center justify-center mx-auto mb-4">
-                    <Image className="w-8 h-8 text-[#a855f7]/50" />
-                  </div>
-                  <p className="text-white font-bold text-base mb-1">Generate Visual Diagrams</p>
-                  <p className="text-white/40 text-xs max-w-xs mx-auto">
-                    Synthesize interactive flowcharts, mindmaps, and architecture diagrams from this research paper.
-                  </p>
-                  <button
-                    onClick={handleGenerateVisuals}
-                    className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#a855f7] to-[#d946ef] text-white text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-lg hover:scale-105"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Generate Napkin Visuals
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Visuals Grid */}
-            {!visualsLoading && visuals.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {visuals.map((visual, idx) => (
-                  <div
-                    key={idx}
-                    className="group bg-slate-900/70 border border-white/15 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-xl hover:border-[#a855f7]/50 transition-all duration-300"
-                  >
-                    {/* Card Header */}
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-gradient-to-r from-[#a855f7] to-[#d946ef]" />
-                        <p className="text-xs font-bold text-white truncate max-w-[200px]">
-                          {visual.label}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-lg bg-[#a855f7]/20 border border-[#a855f7]/30 text-[#d946ef] text-[10px] font-extrabold uppercase">
-                          {visual.format}
-                        </span>
-                        <button
-                          onClick={() => setFullscreenVisual(visual)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-[#a855f7]/20 border border-white/10 hover:border-[#a855f7]/40 text-white/50 hover:text-[#d946ef] text-[10px] font-bold transition-all cursor-pointer"
-                        >
-                          <ZoomIn className="w-3 h-3" />
-                          Expand
-                        </button>
-                        <a
-                          href={visual.url}
-                          download
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 text-white/50 hover:text-emerald-400 text-[10px] font-bold transition-all cursor-pointer"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          ↓ Save
-                        </a>
-                      </div>
-                    </div>
-
-                    {/* Visual Content */}
-                    <div
-                      className="w-full bg-white/5 flex items-center justify-center min-h-[260px] p-4 cursor-zoom-in"
-                      onClick={() => setFullscreenVisual(visual)}
-                    >
-                      {visual.format === "svg" && visualSvgContents[visual.url] ? (
-                        <div
-                          className="w-full h-full max-h-[500px] overflow-hidden [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-h-[480px]"
-                          dangerouslySetInnerHTML={{ __html: visualSvgContents[visual.url] }}
-                        />
-                      ) : (
-                        // Fallback: render as <img> for PNG or if SVG fetch failed
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={visual.url}
-                          alt={visual.label}
-                          className="max-w-full max-h-[480px] rounded-xl object-contain"
-                          onError={e => {
-                            (e.target as HTMLImageElement).style.display = "none";
-                          }}
-                        />
-                      )}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
-                      <p className="text-[10px] text-white/30">
-                        Generated by Napkin AI · Click to expand
-                      </p>
-                      <span className="text-[10px] text-white/30">#{idx + 1} of {visuals.length}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <PaperVisualizationStudio
+            paperId={Number(id)}
+            title={paper.metadata.title || paper.original_filename}
+            visuals={visuals}
+            defaultTab="umap"
+          />
         )}
       </div>
 

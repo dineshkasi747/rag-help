@@ -318,6 +318,141 @@ class PaperService:
                 ]
             }
 
+    async def get_embeddings_projection(self, paper_id: int) -> dict:
+        """
+        Generate 2D and 3D dimensionality reduction & Datashader-style density grid
+        for all text chunks in the paper.
+        """
+        paper = await self._repo.get_by_id(paper_id)
+        if not paper:
+            return {}
+        sections = await self._repo.get_sections(paper_id)
+        
+        from app.services.rag.chunker import SemanticChunker
+        from app.services.rag.dependencies import get_embedder
+        from app.services.rag.projection_service import ProjectionService
+
+        chunker = SemanticChunker()
+        all_chunks = []
+        for s in sections:
+            s_chunks = chunker.chunk_section(
+                text=s.content,
+                paper_id=paper_id,
+                section_id=s.id,
+                section_type=s.section_type,
+                page_number=s.page_number,
+            )
+            all_chunks.extend(s_chunks)
+
+        if not all_chunks:
+            return {"total_chunks": 0, "points": [], "clusters": [], "density_grid": []}
+
+        embedder = get_embedder()
+        texts = [c.text for c in all_chunks]
+        embeddings = await embedder.embed_texts(texts)
+
+        chunk_metas = [
+            {
+                "chunk_id": c.id,
+                "chunk_index": c.chunk_index,
+                "section_type": c.section_type,
+                "page_number": c.page_number,
+                "text": c.text,
+                "token_estimate": c.token_estimate,
+            }
+            for c in all_chunks
+        ]
+
+        projection = ProjectionService.project_embeddings(embeddings, chunk_metas)
+        projection["paper_id"] = paper_id
+        projection["paper_title"] = paper.title or paper.original_filename
+        return projection
+
+    async def project_query_into_space(self, paper_id: int, query: str) -> dict:
+        """
+        Project a user query vector into the 2D/3D semantic space and find nearest neighbor rays.
+        """
+        paper = await self._repo.get_by_id(paper_id)
+        if not paper:
+            return {}
+        sections = await self._repo.get_sections(paper_id)
+        
+        from app.services.rag.chunker import SemanticChunker
+        from app.services.rag.dependencies import get_embedder
+        from app.services.rag.projection_service import ProjectionService
+
+        chunker = SemanticChunker()
+        all_chunks = []
+        for s in sections:
+            s_chunks = chunker.chunk_section(
+                text=s.content,
+                paper_id=paper_id,
+                section_id=s.id,
+                section_type=s.section_type,
+                page_number=s.page_number,
+            )
+            all_chunks.extend(s_chunks)
+
+        if not all_chunks:
+            return {}
+
+        embedder = get_embedder()
+        texts = [c.text for c in all_chunks]
+        embeddings = await embedder.embed_texts(texts)
+        query_emb = await embedder.embed_query(query)
+
+        chunk_metas = [
+            {
+                "chunk_id": c.id,
+                "chunk_index": c.chunk_index,
+                "section_type": c.section_type,
+                "page_number": c.page_number,
+                "text": c.text,
+                "token_estimate": c.token_estimate,
+            }
+            for c in all_chunks
+        ]
+
+        base_proj = ProjectionService.project_embeddings(embeddings, chunk_metas)
+        query_result = ProjectionService.project_query(
+            query_embedding=query_emb,
+            existing_embeddings=embeddings,
+            existing_points=base_proj.get("points", []),
+        )
+        return {
+            "paper_id": paper_id,
+            "query": query,
+            **query_result,
+        }
+
+    async def get_knowledge_graph(self, paper_id: int) -> dict:
+        """
+        Extract Graphistry / GNN-style interactive knowledge graph for a paper.
+        """
+        paper = await self._repo.get_by_id(paper_id)
+        if not paper:
+            return {}
+        sections = await self._repo.get_sections(paper_id)
+        sec_dicts = [
+            {
+                "id": s.id,
+                "section_type": s.section_type,
+                "heading": s.heading,
+                "content": s.content,
+                "page_number": s.page_number,
+            }
+            for s in sections
+        ]
+
+        from app.services.rag.graph_service import GraphService
+        graph_service = GraphService()
+        return await graph_service.extract_knowledge_graph(
+            paper_id=paper_id,
+            title=paper.title or paper.original_filename,
+            abstract=paper.abstract,
+            sections=sec_dicts,
+        )
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------

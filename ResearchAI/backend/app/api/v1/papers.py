@@ -6,6 +6,8 @@ Routes are thin: validate HTTP, delegate to PaperService, return schema.
 import json
 from typing import Optional
 
+from pydantic import BaseModel
+
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -132,6 +134,49 @@ async def generate_paper_visuals(paper_id: int, service: PaperService = Depends(
         raise HTTPException(status_code=404, detail="Paper not found.")
     visuals = await service.generate_and_save_visuals(paper_id)
     return {"paper_id": paper_id, "visuals": visuals, "count": len(visuals)}
+
+
+@router.get("/{paper_id}/embeddings-projection")
+async def get_paper_embeddings_projection(paper_id: int, service: PaperService = Depends(_get_service)):
+    """
+    Return UMAP / PCA 2D and 3D manifold projection coordinates, cluster summaries,
+    and Datashader density grid for all chunk embeddings of a paper.
+    """
+    paper = await service.get_paper(paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found.")
+    return await service.get_embeddings_projection(paper_id)
+
+
+class QueryProjectionRequest(BaseModel):
+    query: str
+
+
+@router.post("/{paper_id}/project-query")
+async def project_query_into_space(
+    paper_id: int,
+    req: QueryProjectionRequest,
+    service: PaperService = Depends(_get_service),
+):
+    """
+    Embed and project a user query into the paper's 2D/3D embedding space
+    and return nearest-neighbor vector rays.
+    """
+    paper = await service.get_paper(paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found.")
+    return await service.project_query_into_space(paper_id, req.query)
+
+
+@router.get("/{paper_id}/knowledge-graph")
+async def get_paper_knowledge_graph(paper_id: int, service: PaperService = Depends(_get_service)):
+    """
+    Return Graphistry / GNN-style interactive knowledge graph (entities, concepts, datasets, relationships).
+    """
+    paper = await service.get_paper(paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found.")
+    return await service.get_knowledge_graph(paper_id)
 
 
 

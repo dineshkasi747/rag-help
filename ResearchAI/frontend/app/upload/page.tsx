@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppShell from "../components/AppShell";
+import PaperVisualizationStudio from "../components/visuals/PaperVisualizationStudio";
 import { 
   CloudUpload, 
   FileText, 
@@ -254,177 +255,16 @@ export default function UploadPage() {
         </div>
 
         {/* ========================================================================= */}
-        {/* SECTION 1: INSTANT VISUALIZATION PREVIEW (SHOWN IMMEDIATELY WHEN UPLOADED) */}
+        {/* SECTION 1: INSTANT MULTI-PARADIGM VISUALIZATION STUDIO */}
         {/* ========================================================================= */}
         {activePaperId && (
-          <div className="bg-gradient-to-br from-[#130f2b] to-[#1e1540] border-2 border-[#7a4aff]/60 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-            {/* Ambient Background Glow */}
-            <div className="absolute top-0 right-0 w-96 h-96 bg-[#7a4aff]/15 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#d946ef]/15 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="relative z-10 space-y-6">
-              {/* Visual Studio Header */}
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-5">
-                <div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#7a4aff]/20 border border-[#7a4aff]/40 text-[#d946ef] text-xs font-extrabold uppercase tracking-wider mb-2">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Instant AI Visualizer · Napkin Engine</span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight truncate max-w-2xl">
-                    {activePaperName}
-                  </h2>
-                  <p className="text-white/50 text-xs mt-1">
-                    Visual diagrams synthesized from extracted sections and methodology.
-                  </p>
-                </div>
-
-                {/* Primary Action Buttons */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <button
-                    onClick={() => fetchVisualsForPaper(activePaperId, activePaperName)}
-                    disabled={visualsLoading}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${visualsLoading ? "animate-spin" : ""}`} />
-                    <span>Regenerate</span>
-                  </button>
-
-                  <Link
-                    href={`/papers/${activePaperId}?tab=visuals`}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#7a4aff] to-[#d946ef] hover:from-[#6b38ef] hover:to-[#c026d3] text-white text-xs font-bold transition-all shadow-lg shadow-purple-900/40 cursor-pointer"
-                  >
-                    <span>Full Paper Studio</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-
-                  <Link
-                    href="/analytics"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer"
-                  >
-                    <BarChart3 className="w-3.5 h-3.5" />
-                    <span>See in Analytics</span>
-                  </Link>
-
-                  <Link
-                    href={`/chat?paperId=${activePaperId}`}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 text-xs font-bold transition-all cursor-pointer"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>Chat</span>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Diagram Selector Tabs */}
-              {visuals.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {visuals.map((v, idx) => {
-                    const isActive = selectedDiagramIndex === idx;
-                    let TabIcon = Workflow;
-                    if (idx === 1) TabIcon = BrainCircuit;
-                    if (idx === 2) TabIcon = GitBranch;
-
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => setSelectedDiagramIndex(idx)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          isActive
-                            ? "bg-gradient-to-r from-[#7a4aff] to-[#d946ef] text-white shadow-lg shadow-purple-900/50 scale-[1.02]"
-                            : "bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/10"
-                        }`}
-                      >
-                        <TabIcon className="w-4 h-4" />
-                        <span>{v.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Loading State */}
-              {visualsLoading && (
-                <div className="py-20 flex flex-col items-center justify-center space-y-4 border border-dashed border-white/20 rounded-2xl bg-black/30">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-full border-4 border-[#7a4aff]/20 border-t-[#d946ef] animate-spin" />
-                    <Sparkles className="w-6 h-6 text-[#d946ef] absolute inset-0 m-auto animate-pulse" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-white font-extrabold text-base">Synthesizing Visual Diagrams...</p>
-                    <p className="text-white/50 text-xs mt-1">Generating Flowchart, Mindmap &amp; Architecture SVGs</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Error / Pending Notice */}
-              {!visualsLoading && visualsError && visuals.length === 0 && (
-                <div className="py-12 px-6 text-center border border-amber-500/30 rounded-2xl bg-amber-500/10">
-                  <p className="text-amber-300 font-bold text-sm">{visualsError}</p>
-                  <button
-                    onClick={() => fetchVisualsForPaper(activePaperId, activePaperName)}
-                    className="mt-4 px-5 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-all cursor-pointer"
-                  >
-                    Retry Visualization
-                  </button>
-                </div>
-              )}
-
-              {/* Active Diagram Viewer */}
-              {!visualsLoading && currentVisual && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between px-2">
-                    <span className="text-xs font-bold text-white/70">
-                      Diagram {selectedDiagramIndex + 1} of {visuals.length}:&nbsp;
-                      <span className="text-white font-extrabold">{currentVisual.label}</span>
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setFullscreenVisual(currentVisual)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-[#7a4aff]/30 border border-white/15 text-white/80 hover:text-white text-xs font-bold transition-all cursor-pointer"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5" />
-                        <span>Fullscreen</span>
-                      </button>
-                      <a
-                        href={currentVisual.url}
-                        download={`${activePaperName}_diagram_${selectedDiagramIndex + 1}.svg`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-emerald-500/30 border border-white/15 text-white/80 hover:text-emerald-300 text-xs font-bold transition-all cursor-pointer"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download SVG</span>
-                      </a>
-                    </div>
-                  </div>
-
-                  {/* SVG Container with Cursor Zoom */}
-                  <div
-                    onClick={() => setFullscreenVisual(currentVisual)}
-                    className="w-full bg-[#0a0718] border border-white/15 rounded-2xl p-6 sm:p-8 flex items-center justify-center min-h-[380px] max-h-[560px] overflow-hidden shadow-inner cursor-zoom-in group relative"
-                  >
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 px-3 py-1.5 rounded-xl border border-white/10 text-[11px] text-white/80 font-bold backdrop-blur">
-                      Click to expand fullscreen
-                    </div>
-
-                    {currentVisual.format === "svg" && svgMap[currentVisual.url] ? (
-                      <div
-                        className="w-full h-full max-h-[500px] overflow-hidden flex items-center justify-center [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-h-[480px]"
-                        dangerouslySetInnerHTML={{ __html: svgMap[currentVisual.url] }}
-                      />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={currentVisual.url}
-                        alt={currentVisual.label}
-                        className="max-w-full max-h-[480px] object-contain rounded-xl"
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="space-y-4">
+            <PaperVisualizationStudio
+              paperId={activePaperId}
+              title={activePaperName}
+              visuals={visuals}
+              defaultTab="umap"
+            />
           </div>
         )}
 
