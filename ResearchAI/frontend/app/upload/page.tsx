@@ -279,13 +279,24 @@ export default function UploadPage() {
               Upload any PDF paper to instantly generate Napkin AI visual flowcharts, mindmaps &amp; architectures.
             </p>
           </div>
-          <Link
-            href="/analytics"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-bold hover:bg-white/20 transition-all cursor-pointer"
-          >
-            <BarChart3 className="w-4 h-4 text-emerald-400" />
-            <span>View All Analytics</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <a
+              href="/HyperGraph_RAG_Research_Paper.pdf"
+              download="HyperGraph_RAG_Research_Paper.pdf"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-violet-600/20 border border-violet-500/40 text-violet-300 text-xs font-bold hover:bg-violet-600/30 transition-all cursor-pointer shadow-sm"
+              title="Download publication-grade sample research paper PDF"
+            >
+              <Download className="w-4 h-4 text-violet-400" />
+              <span>Sample Paper PDF</span>
+            </a>
+            <Link
+              href="/analytics"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-bold hover:bg-white/20 transition-all cursor-pointer"
+            >
+              <BarChart3 className="w-4 h-4 text-emerald-400" />
+              <span>View All Analytics</span>
+            </Link>
+          </div>
         </div>
 
         {/* ========================================================================= */}

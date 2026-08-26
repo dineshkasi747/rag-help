@@ -33,6 +33,8 @@ backend/uploads/
 backend/qdrant_storage/
 backend/data/
 *.pdf
+!HyperGraph_RAG_Research_Paper.pdf
+!frontend/public/HyperGraph_RAG_Research_Paper.pdf
 
 # ── ML MODEL CACHES ──────────────────────────────────────────────────────────
 backend/.model_cache/
