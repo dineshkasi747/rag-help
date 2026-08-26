@@ -69,6 +69,12 @@ async def upload_papers_batch(
     return results
 
 
+@router.get("/stats/overview")
+async def get_system_stats(service: PaperService = Depends(_get_service)):
+    """Return live system analytics and paper statistics."""
+    return await service.get_system_stats()
+
+
 @router.get("", response_model=list[PaperRead])
 async def list_papers(
     skip: int = Query(0, ge=0),
@@ -106,13 +112,25 @@ async def get_paper_summary(paper_id: int, service: PaperService = Depends(_get_
 @router.get("/{paper_id}/visuals")
 async def get_paper_visuals(paper_id: int, service: PaperService = Depends(_get_service)):
     """
-    Return cached Napkin AI generated visual diagram URLs for a paper.
-    Returns an empty list if visuals have not been generated yet.
+    Return Napkin AI / dynamic SVG generated visual diagrams for a paper.
+    If not yet generated, generates and caches them on the fly.
     """
     paper = await service.get_paper(paper_id)
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found.")
     visuals = await service.get_napkin_visuals(paper_id)
+    return {"paper_id": paper_id, "visuals": visuals, "count": len(visuals)}
+
+
+@router.post("/{paper_id}/visuals/generate")
+async def generate_paper_visuals(paper_id: int, service: PaperService = Depends(_get_service)):
+    """
+    Trigger or re-generate Napkin AI / dynamic SVG visual diagrams for a paper on demand.
+    """
+    paper = await service.get_paper(paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found.")
+    visuals = await service.generate_and_save_visuals(paper_id)
     return {"paper_id": paper_id, "visuals": visuals, "count": len(visuals)}
 
 

@@ -86,12 +86,13 @@ export default function PaperDetailsPage() {
 
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
     Promise.all([
-      fetch(`${API}/papers/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API}/papers/${id}/sections`, { headers: { Authorization: `Bearer ${token}` } })
+      fetch(`${API}/papers/${id}`, { headers }),
+      fetch(`${API}/papers/${id}/sections`, { headers })
     ])
       .then(async ([paperRes, sectionsRes]) => {
         if (!paperRes.ok) {
@@ -111,7 +112,7 @@ export default function PaperDetailsPage() {
       });
 
     // Fetch AI visual summary
-    fetch(`${API}/papers/${id}/summary`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API}/papers/${id}/summary`, { headers })
       .then(res => res.json())
       .then(data => {
         setSummary(data);
@@ -123,35 +124,68 @@ export default function PaperDetailsPage() {
       });
   }, [id]);
 
-  // Fetch Napkin visuals when AI Visuals tab is opened
-  const fetchVisuals = async () => {
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
-    setVisualsLoading(true);
-    setVisualsError("");
-    try {
-      const res = await fetch(`${API}/papers/${id}/visuals`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Failed to load visuals");
-      const data = await res.json();
-      setVisuals(data.visuals || []);
-
-      // Pre-fetch SVG content for inline rendering
-      const svgMap: Record<string, string> = {};
-      await Promise.all(
-        (data.visuals || []).filter((v: NapkinVisual) => v.format === "svg").map(async (v: NapkinVisual) => {
-          try {
+  // Process and extract SVG strings for inline rendering
+  const processSvgVisuals = async (visualList: NapkinVisual[]) => {
+    const svgMap: Record<string, string> = {};
+    await Promise.all(
+      visualList.filter((v: NapkinVisual) => v.format === "svg").map(async (v: NapkinVisual) => {
+        try {
+          if (v.url.startsWith("data:image/svg+xml;utf8,")) {
+            svgMap[v.url] = decodeURIComponent(v.url.replace("data:image/svg+xml;utf8,", ""));
+          } else {
             const svgRes = await fetch(v.url);
             if (svgRes.ok) {
               svgMap[v.url] = await svgRes.text();
             }
-          } catch { /* ignore individual fetch errors */ }
-        })
-      );
-      setVisualSvgContents(svgMap);
+          }
+        } catch { /* ignore individual fetch errors */ }
+      })
+    );
+    setVisualSvgContents(svgMap);
+  };
+
+  // Fetch Napkin visuals when AI Visuals tab is opened
+  const fetchVisuals = async () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    setVisualsLoading(true);
+    setVisualsError("");
+    try {
+      const res = await fetch(`${API}/papers/${id}/visuals`, { headers });
+      if (!res.ok) throw new Error("Failed to load visuals");
+      const data = await res.json();
+      const list = data.visuals || [];
+      setVisuals(list);
+      await processSvgVisuals(list);
     } catch (err) {
-      setVisualsError("Could not load Napkin AI visuals. They may still be generating.");
+      setVisualsError("Could not load Napkin AI visuals. Click Generate to create them.");
+    } finally {
+      setVisualsLoading(false);
+    }
+  };
+
+  // Generate / Regenerate visuals on demand
+  const handleGenerateVisuals = async () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    setVisualsLoading(true);
+    setVisualsError("");
+    try {
+      const res = await fetch(`${API}/papers/${id}/visuals/generate`, {
+        method: "POST",
+        headers,
+      });
+      if (!res.ok) throw new Error("Failed to generate visuals");
+      const data = await res.json();
+      const list = data.visuals || [];
+      setVisuals(list);
+      await processSvgVisuals(list);
+    } catch (err) {
+      setVisualsError("Visual generation encountered an error. Please try again.");
     } finally {
       setVisualsLoading(false);
     }
@@ -467,24 +501,34 @@ export default function PaperDetailsPage() {
         {activeTab === "visuals" && (
           <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-white/50 uppercase tracking-wider flex items-center gap-2">
                   <Image className="w-4 h-4 text-[#a855f7]" />
-                  AI-Generated Diagrams · Powered by Napkin AI
+                  AI-Generated Diagrams · Powered by Napkin AI &amp; SVG Studio
                 </p>
                 <p className="text-white/40 text-xs mt-1">
-                  Visual flowcharts and mindmaps auto-generated from this paper&apos;s content.
+                  Visual flowcharts, mindmaps, and architecture diagrams generated from this paper&apos;s content.
                 </p>
               </div>
-              <button
-                onClick={fetchVisuals}
-                disabled={visualsLoading}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${visualsLoading ? "animate-spin" : ""}`} />
-                Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={fetchVisuals}
+                  disabled={visualsLoading}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-white/20 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${visualsLoading ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+                <button
+                  onClick={handleGenerateVisuals}
+                  disabled={visualsLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] hover:from-[#7C3AED] hover:to-[#C026D3] text-white text-xs font-bold shadow-lg shadow-purple-900/30 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {visuals.length > 0 ? "Regenerate Visuals" : "Generate Visuals"}
+                </button>
+              </div>
             </div>
 
             {/* Loading Skeletons */}
@@ -506,13 +550,13 @@ export default function PaperDetailsPage() {
                 <div className="text-4xl mb-3">⏳</div>
                 <p className="text-amber-300 font-bold text-sm">{visualsError}</p>
                 <p className="text-white/40 text-xs mt-2">
-                  Napkin AI visuals are generated after paper processing completes. Try refreshing in a moment.
+                  Click Generate Visuals below to synthesize diagrams for this paper.
                 </p>
                 <button
-                  onClick={fetchVisuals}
-                  className="mt-4 px-5 py-2.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-amber-500/30 transition-all cursor-pointer"
+                  onClick={handleGenerateVisuals}
+                  className="mt-4 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] text-white text-xs font-bold transition-all shadow-md cursor-pointer"
                 >
-                  Try Again
+                  Generate Visuals Now
                 </button>
               </div>
             )}
@@ -525,17 +569,16 @@ export default function PaperDetailsPage() {
                   <div className="w-16 h-16 rounded-2xl bg-[#a855f7]/10 border border-[#a855f7]/20 flex items-center justify-center mx-auto mb-4">
                     <Image className="w-8 h-8 text-[#a855f7]/50" />
                   </div>
-                  <p className="text-white font-bold text-base mb-1">No visuals generated yet</p>
+                  <p className="text-white font-bold text-base mb-1">Generate Visual Diagrams</p>
                   <p className="text-white/40 text-xs max-w-xs mx-auto">
-                    Napkin AI diagrams are generated automatically after paper processing. Check back once the paper status is&nbsp;
-                    <span className="text-emerald-400 font-bold">Completed</span>.
+                    Synthesize interactive flowcharts, mindmaps, and architecture diagrams from this research paper.
                   </p>
                   <button
-                    onClick={fetchVisuals}
-                    className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#a855f7] to-[#d946ef] text-white text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-lg"
+                    onClick={handleGenerateVisuals}
+                    className="mt-6 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#a855f7] to-[#d946ef] text-white text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-lg hover:scale-105"
                   >
-                    <RefreshCw className="w-4 h-4" />
-                    Check for Visuals
+                    <Sparkles className="w-4 h-4" />
+                    Generate Napkin Visuals
                   </button>
                 </div>
               </div>

@@ -52,6 +52,53 @@ class PaperRepository:
         )
         return list(result.scalars().all())
 
+    async def get_system_stats(self) -> dict:
+        from sqlalchemy import func
+        total_papers = (await self._db.execute(select(func.count(Paper.id)))).scalar() or 0
+        completed = (await self._db.execute(select(func.count(Paper.id)).where(Paper.status == 'completed'))).scalar() or 0
+        processing = (await self._db.execute(select(func.count(Paper.id)).where(Paper.status == 'processing'))).scalar() or 0
+        pending = (await self._db.execute(select(func.count(Paper.id)).where(Paper.status == 'pending'))).scalar() or 0
+        failed = (await self._db.execute(select(func.count(Paper.id)).where(Paper.status == 'failed'))).scalar() or 0
+        total_sections = (await self._db.execute(select(func.count(Section.id)))).scalar() or 0
+        total_pages = (await self._db.execute(select(func.coalesce(func.sum(Paper.page_count), 0)))).scalar() or 0
+        total_bytes = (await self._db.execute(select(func.coalesce(func.sum(Paper.file_size_bytes), 0)))).scalar() or 0
+        visuals_count = (await self._db.execute(
+            select(func.count(Paper.id)).where(Paper.napkin_visuals.isnot(None), Paper.napkin_visuals != '[]', Paper.napkin_visuals != '')
+        )).scalar() or 0
+
+        recent_res = await self._db.execute(select(Paper).order_by(Paper.uploaded_at.desc()).limit(5))
+        recent_papers = recent_res.scalars().all()
+
+        return {
+            "total_papers": total_papers,
+            "completed_papers": completed,
+            "processing_papers": processing,
+            "pending_papers": pending,
+            "failed_papers": failed,
+            "total_sections": total_sections,
+            "total_pages": int(total_pages),
+            "total_file_size_bytes": int(total_bytes),
+            "visuals_count": visuals_count,
+            "vector_chunks_count": total_sections * 3 if total_sections > 0 else 0,
+            "active_models": {
+                "llm": f"{settings.environment} / Groq LLaMA-3.3-70B",
+                "embedding": "Google Gemini Embedding 001",
+                "visualizer": "Napkin AI & Dynamic SVG Engine",
+            },
+            "recent_papers": [
+                {
+                    "id": p.id,
+                    "title": p.title or p.original_filename,
+                    "original_filename": p.original_filename,
+                    "status": p.status,
+                    "uploaded_at": p.uploaded_at.isoformat() if p.uploaded_at else None,
+                    "page_count": p.page_count,
+                    "has_visuals": bool(p.napkin_visuals and p.napkin_visuals != "[]"),
+                }
+                for p in recent_papers
+            ]
+        }
+
     # ------------------------------------------------------------------
     # Mutations
     # ------------------------------------------------------------------

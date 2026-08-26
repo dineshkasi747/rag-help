@@ -201,16 +201,52 @@ class PaperService:
     async def get_sections(self, paper_id: int):
         return await self._repo.get_sections(paper_id)
 
+    async def get_system_stats(self) -> dict:
+        return await self._repo.get_system_stats()
+
+    async def generate_and_save_visuals(self, paper_id: int) -> list[dict]:
+        """Generate and save Napkin / SVG visual diagrams for a paper on demand."""
+        paper = await self._repo.get_by_id(paper_id)
+        if not paper:
+            return []
+        sections = await self._repo.get_sections(paper_id)
+
+        methodology_content = next(
+            (s.content for s in sections if s.section_type in ("methodology", "methods", "body", "introduction")),
+            None,
+        )
+        key_findings_list: list[str] = []
+        if paper.abstract:
+            key_findings_list = [s.strip() for s in paper.abstract.split(".") if len(s.strip()) > 30][:4]
+
+        napkin = NapkinService()
+        visuals = await napkin.generate_visuals_for_paper(
+            paper_id=paper_id,
+            title=paper.title or paper.original_filename,
+            abstract=paper.abstract,
+            methodology=methodology_content,
+            key_findings=key_findings_list or None,
+        )
+        if visuals:
+            await self._repo.save_napkin_visuals(paper_id, visuals)
+        return visuals
+
     async def get_napkin_visuals(self, paper_id: int) -> list[dict]:
-        """Return the cached Napkin AI visuals for a paper, or [] if not yet generated."""
+        """Return the cached Napkin AI visuals for a paper, or generate dynamically if missing."""
         import json
         paper = await self._repo.get_by_id(paper_id)
-        if not paper or not paper.napkin_visuals:
+        if not paper:
             return []
-        try:
-            return json.loads(paper.napkin_visuals)
-        except Exception:
-            return []
+        if paper.napkin_visuals:
+            try:
+                parsed = json.loads(paper.napkin_visuals)
+                if parsed:
+                    return parsed
+            except Exception:
+                pass
+        
+        # If no visuals yet and paper exists, auto-generate them
+        return await self.generate_and_save_visuals(paper_id)
 
     async def generate_paper_summary(self, paper_id: int) -> dict:
         paper = await self._repo.get_by_id(paper_id)

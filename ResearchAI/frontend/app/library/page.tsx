@@ -44,8 +44,11 @@ export default function LibraryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    fetch(`${API}/papers`, { headers: { Authorization: `Bearer ${token}` } })
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    fetch(`${API}/papers`, { headers })
       .then(r => r.ok ? r.json() : [])
       .then(data => { setPapers(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
