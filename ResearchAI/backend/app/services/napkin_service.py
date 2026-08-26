@@ -215,6 +215,10 @@ class NapkinService:
         try:
             llm = get_llm()
             raw_res = await llm.complete(prompt)
+            import re
+            json_match = re.search(r"\{.*\}", raw_res, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
             clean_json = raw_res.strip().replace("```json", "").replace("```", "").strip()
             return json.loads(clean_json)
         except Exception as e:
