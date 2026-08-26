@@ -22,6 +22,7 @@ from app.models.paper import Paper, ProcessingStatus, Section
 from app.repositories.paper_repository import PaperRepository
 from app.schemas.paper import PaperUploadResponse
 from app.services.parsers.pdf_parser import PDFParser
+from app.services.napkin_service import NapkinService
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ class PaperService:
             original_filename=file.filename or "upload.pdf",
             storage_path=str(storage_path),
             file_size_bytes=len(content),
-            status=ProcessingStatus.PENDING,
+            status="pending",
         )
         paper = await self._repo.create(paper)
 
@@ -98,7 +99,7 @@ class PaperService:
                 logger.error("process_paper: paper_id=%s not found", paper_id)
                 return
 
-            await repo.update_status(paper_id, ProcessingStatus.PROCESSING)
+            await repo.update_status(paper_id, "processing")
             try:
                 parsed = _parser.parse(Path(paper.storage_path))
 
@@ -154,13 +155,37 @@ class PaperService:
                 await repo.update_status(paper_id, ProcessingStatus.COMPLETED)
                 logger.info("paper_id=%s processed successfully (%d sections)", paper_id, len(section_rows))
 
-            except Exception as exc:
-                logger.exception("Failed to process paper_id=%s", paper_id)
-                await repo.update_status(
-                    paper_id,
-                    ProcessingStatus.FAILED,
-                    error_message=str(exc),
-                )
+                # Napkin AI: generate visual diagrams from paper content (additive — won't fail processing)
+                try:
+                    napkin = NapkinService()
+                    # Build methodology text from first body/methodology section content
+                    methodology_content = next(
+                        (s.content for s in section_rows if s.section_type in ("methodology", "methods", "body", "introduction")),
+                        None,
+                    )
+                    key_findings_list: list[str] = []
+                    if parsed.abstract:
+                        # Use abstract sentences as quick finding proxies
+                        key_findings_list = [s.strip() for s in parsed.abstract.split(".") if len(s.strip()) > 30][:4]
+
+                    napkin_visuals = await napkin.generate_visuals_for_paper(
+                        paper_id=paper_id,
+                        title=parsed.title,
+                        abstract=parsed.abstract,
+                        methodology=methodology_content,
+                        key_findings=key_findings_list or None,
+                    )
+                    if napkin_visuals:
+                        await repo.save_napkin_visuals(paper_id, napkin_visuals)
+                except Exception as napkin_exc:
+                    logger.warning("Napkin visual generation failed for paper_id=%s: %s", paper_id, napkin_exc)
+                
+                await repo.update_status(paper_id, "completed")
+                logger.info("process_paper: finished paper_id=%s", paper_id)
+
+            except Exception as e:
+                logger.exception("process_paper: error on paper_id=%s", paper_id)
+                await repo.update_status(paper_id, "failed", error_message=str(e))
 
     # ------------------------------------------------------------------
     # Queries
@@ -174,6 +199,17 @@ class PaperService:
 
     async def get_sections(self, paper_id: int):
         return await self._repo.get_sections(paper_id)
+
+    async def get_napkin_visuals(self, paper_id: int) -> list[dict]:
+        """Return the cached Napkin AI visuals for a paper, or [] if not yet generated."""
+        import json
+        paper = await self._repo.get_by_id(paper_id)
+        if not paper or not paper.napkin_visuals:
+            return []
+        try:
+            return json.loads(paper.napkin_visuals)
+        except Exception:
+            return []
 
     async def generate_paper_summary(self, paper_id: int) -> dict:
         paper = await self._repo.get_by_id(paper_id)

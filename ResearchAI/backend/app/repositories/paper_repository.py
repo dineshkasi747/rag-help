@@ -13,7 +13,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.paper import Paper, ProcessingStatus, Section
+from app.models.paper import Paper, Section
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class PaperRepository:
     async def update_status(
         self,
         paper_id: int,
-        status: ProcessingStatus,
+        status: str,
         error_message: Optional[str] = None,
     ) -> None:
         paper = await self.get_by_id(paper_id)
@@ -75,7 +75,7 @@ class PaperRepository:
         paper.status = status
         if error_message:
             paper.error_message = error_message
-        if status == ProcessingStatus.COMPLETED:
+        if status == "completed":
             paper.processed_at = datetime.now(timezone.utc)
         await self._db.commit()
 
@@ -93,3 +93,13 @@ class PaperRepository:
     async def create_sections(self, sections: list[Section]) -> None:
         self._db.add_all(sections)
         await self._db.commit()
+
+    async def save_napkin_visuals(self, paper_id: int, visuals: list[dict]) -> None:
+        """Persist Napkin AI generated visual data (list of {url, format} dicts) to the DB."""
+        paper = await self.get_by_id(paper_id)
+        if not paper:
+            return
+        paper.napkin_visuals = json.dumps(visuals)
+        await self._db.commit()
+        logger.info("Saved %d Napkin visuals for paper_id=%s", len(visuals), paper_id)
+

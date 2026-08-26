@@ -34,12 +34,11 @@ class Paper(Base):
     # Processing lifecycle
     status = Column(
         Enum(
-            ProcessingStatus, 
-            name="processing_status_enum",
-            values_callable=lambda obj: [e.value for e in obj]
+            "pending", "processing", "completed", "failed",
+            name="processing_status_enum"
         ),
         nullable=False,
-        default=ProcessingStatus.PENDING,
+        default="pending",
     )
     error_message = Column(Text, nullable=True)
 
