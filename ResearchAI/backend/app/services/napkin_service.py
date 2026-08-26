@@ -220,8 +220,9 @@ class NapkinService:
             if json_match:
                 return json.loads(json_match.group(0))
             clean_json = raw_res.strip().replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_json)
         except Exception as e:
+            logger.warning("LLM visual extraction error: %s. Using heuristic extraction.", e)
+            return self._heuristic_structure_extraction(title, abstract, methodology, key_findings, raw_text)
     def _heuristic_structure_extraction(
         self,
         title: Optional[str],
@@ -325,6 +326,7 @@ class NapkinService:
                             {"name": "Prediction Head", "desc": "Logits generation & decoding"},
                             {"name": "Evaluation Metric", "desc": f"Result: {metrics[0]}" if metrics else "Benchmark validation"},
                             {"name": "Output Artifacts", "desc": "Export & reporting"}
+                        ]
                     }
                 ]
             }
