@@ -7,7 +7,7 @@ and returns the User ORM object — or raises 401.
 """
 
 import logging
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -44,3 +44,19 @@ async def get_current_user(
         raise _UNAUTHORIZED
 
     return user
+
+
+_bearer_optional = HTTPBearer(auto_error=False)
+
+
+async def get_optional_current_user(
+    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer_optional)] = None,
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    if not credentials or not credentials.credentials:
+        return None
+    subject = get_subject(credentials.credentials)
+    if not subject:
+        return None
+    repo = UserRepository(db)
+    return await repo.get_by_email(subject)

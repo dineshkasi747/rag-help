@@ -158,15 +158,15 @@ class PaperService:
                 # Napkin AI: generate visual diagrams from paper content (additive — won't fail processing)
                 try:
                     napkin = NapkinService()
-                    # Build methodology text from first body/methodology section content
                     methodology_content = next(
                         (s.content for s in section_rows if s.section_type in ("methodology", "methods", "body", "introduction")),
                         None,
                     )
                     key_findings_list: list[str] = []
                     if parsed.abstract:
-                        # Use abstract sentences as quick finding proxies
                         key_findings_list = [s.strip() for s in parsed.abstract.split(".") if len(s.strip()) > 30][:4]
+
+                    full_context_text = "\n\n".join([f"[{s.section_type}] {s.content}" for s in section_rows[:8]])
 
                     napkin_visuals = await napkin.generate_visuals_for_paper(
                         paper_id=paper_id,
@@ -174,6 +174,7 @@ class PaperService:
                         abstract=parsed.abstract,
                         methodology=methodology_content,
                         key_findings=key_findings_list or None,
+                        raw_text=full_context_text,
                     )
                     if napkin_visuals:
                         await repo.save_napkin_visuals(paper_id, napkin_visuals)
@@ -219,6 +220,8 @@ class PaperService:
         if paper.abstract:
             key_findings_list = [s.strip() for s in paper.abstract.split(".") if len(s.strip()) > 30][:4]
 
+        full_context_text = "\n\n".join([f"[{s.section_type}] {s.content}" for s in sections[:8]])
+
         napkin = NapkinService()
         visuals = await napkin.generate_visuals_for_paper(
             paper_id=paper_id,
@@ -226,6 +229,7 @@ class PaperService:
             abstract=paper.abstract,
             methodology=methodology_content,
             key_findings=key_findings_list or None,
+            raw_text=full_context_text,
         )
         if visuals:
             await self._repo.save_napkin_visuals(paper_id, visuals)
@@ -285,6 +289,10 @@ class PaperService:
                 }
             ]
             raw_res = await llm.complete(prompt)
+            import re
+            json_match = re.search(r"\{.*\}", raw_res, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
             clean_json = raw_res.strip().replace("```json", "").replace("```", "").strip()
             return json.loads(clean_json)
         except Exception as e:

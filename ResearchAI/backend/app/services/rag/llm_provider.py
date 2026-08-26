@@ -4,8 +4,7 @@ LLM provider abstraction layer.
 Design rationale:
 - Abstract base class + factory pattern allows dropping in any LLM.
 - All providers expose a unified `complete()` and `stream()` interface.
-- System prompt + conversation history is managed by the caller (RAGPipeline).
-- Streaming: yields text delta strings for SSE transport.
+- Includes automatic multi-model fallback across supported models and providers.
 """
 
 from __future__ import annotations
@@ -30,59 +29,40 @@ class BaseLLM(ABC):
 
 
 # ---------------------------------------------------------------------------
-# Anthropic Claude
-# ---------------------------------------------------------------------------
-
-class AnthropicLLM(BaseLLM):
-    def __init__(self, model: str = "claude-3-5-haiku-latest", api_key: str | None = None):
-        self._model = model
-        self._api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
-
-    async def complete(self, messages: list[dict]) -> str:
-        import anthropic
-        client = anthropic.AsyncAnthropic(api_key=self._api_key)
-        # Extract system from messages
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        user_msgs = [m for m in messages if m["role"] != "system"]
-        resp = await client.messages.create(
-            model=self._model, max_tokens=2048, system=system, messages=user_msgs
-        )
-        return resp.content[0].text
-
-    async def stream(self, messages: list[dict]) -> AsyncGenerator[str, None]:
-        import anthropic
-        client = anthropic.AsyncAnthropic(api_key=self._api_key)
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        user_msgs = [m for m in messages if m["role"] != "system"]
-        async with client.messages.stream(
-            model=self._model, max_tokens=2048, system=system, messages=user_msgs
-        ) as s:
-            async for text in s.text_stream:
-                yield text
-
-
-# ---------------------------------------------------------------------------
 # Google Gemini
 # ---------------------------------------------------------------------------
 
 class GeminiLLM(BaseLLM):
-    def __init__(self, model: str = "gemini-2.0-flash", api_key: str | None = None):
+    FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-pro"]
+
+    def __init__(self, model: str = "gemini-2.5-flash", api_key: str | None = None):
         self._model = model
         self._api_key = api_key or os.getenv("GEMINI_API_KEY", "")
 
     async def complete(self, messages: list[dict]) -> str:
         import google.generativeai as genai
         genai.configure(api_key=self._api_key)
-        model = genai.GenerativeModel(self._model)
         prompt = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
-        resp = await model.generate_content_async(prompt)
-        return resp.text
+        
+        models_to_try = [self._model] + [m for m in self.FALLBACK_MODELS if m != self._model]
+        last_err = None
+        for m in models_to_try:
+            try:
+                model = genai.GenerativeModel(m)
+                resp = await model.generate_content_async(prompt)
+                if resp.text:
+                    return resp.text
+            except Exception as e:
+                last_err = e
+                logger.warning("Gemini model %s failed: %s", m, e)
+        raise last_err or Exception("All Gemini models failed")
 
     async def stream(self, messages: list[dict]) -> AsyncGenerator[str, None]:
         import google.generativeai as genai
         genai.configure(api_key=self._api_key)
-        model = genai.GenerativeModel(self._model)
         prompt = "\n".join(f"{m['role'].upper()}: {m['content']}" for m in messages)
+        
+        model = genai.GenerativeModel(self._model)
         async for chunk in await model.generate_content_async(prompt, stream=True):
             if chunk.text:
                 yield chunk.text
@@ -93,25 +73,69 @@ class GeminiLLM(BaseLLM):
 # ---------------------------------------------------------------------------
 
 class GroqLLM(BaseLLM):
-    def __init__(self, model: str = "llama-3.3-70b-versatile", api_key: str | None = None):
+    FALLBACK_MODELS = [
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        "qwen/qwen3.8-27b",
+        "groq/compound",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant"
+    ]
+
+    def __init__(self, model: str = "openai/gpt-oss-120b", api_key: str | None = None):
         self._model = model
         self._api_key = api_key or os.getenv("GROQ_API_KEY", "")
 
     async def complete(self, messages: list[dict]) -> str:
         from openai import AsyncOpenAI
         client = AsyncOpenAI(api_key=self._api_key, base_url="https://api.groq.com/openai/v1")
-        resp = await client.chat.completions.create(model=self._model, messages=messages)
-        return resp.choices[0].message.content or ""
+        
+        models_to_try = [self._model] + [m for m in self.FALLBACK_MODELS if m != self._model]
+        last_err = None
+        for m in models_to_try:
+            try:
+                resp = await client.chat.completions.create(model=m, messages=messages)
+                content = resp.choices[0].message.content or ""
+                if content:
+                    return content
+            except Exception as e:
+                last_err = e
+                logger.warning("Groq model %s error: %s, trying next model...", m, e)
+                
+        # If Groq completely fails and Gemini key is available, fallback to Gemini
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if gemini_key:
+            try:
+                logger.info("Falling back to Gemini LLM from Groq...")
+                gemini_llm = GeminiLLM(api_key=gemini_key)
+                return await gemini_llm.complete(messages)
+            except Exception as gem_e:
+                logger.warning("Fallback to Gemini also failed: %s", gem_e)
+
+        raise last_err or Exception("All Groq models failed")
 
     async def stream(self, messages: list[dict]) -> AsyncGenerator[str, None]:
         from openai import AsyncOpenAI
         client = AsyncOpenAI(api_key=self._api_key, base_url="https://api.groq.com/openai/v1")
-        response = await client.chat.completions.create(model=self._model, messages=messages, stream=True)
-        async for chunk in response:
-            if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
-                delta = chunk.choices[0].delta.content
-                if delta:
-                    yield delta
+        
+        models_to_try = [self._model] + [m for m in self.FALLBACK_MODELS if m != self._model]
+        stream_started = False
+        
+        for m in models_to_try:
+            try:
+                response = await client.chat.completions.create(model=m, messages=messages, stream=True)
+                async for chunk in response:
+                    if hasattr(chunk, 'choices') and len(chunk.choices) > 0:
+                        delta = chunk.choices[0].delta.content
+                        if delta:
+                            stream_started = True
+                            yield delta
+                if stream_started:
+                    return
+            except Exception as e:
+                if stream_started:
+                    raise
+                logger.warning("Groq stream model %s error: %s, trying next model...", m, e)
 
 
 # ---------------------------------------------------------------------------
@@ -120,15 +144,14 @@ class GroqLLM(BaseLLM):
 
 def get_llm() -> BaseLLM:
     provider = os.getenv("LLM_PROVIDER", "groq").lower()
-    if provider == "anthropic":
-        model = os.getenv("LLM_MODEL", "claude-3-5-haiku-latest")
-        logger.info("Using Anthropic LLM: %s", model)
-        return AnthropicLLM(model=model)
-    elif provider == "gemini":
-        model = os.getenv("LLM_MODEL", "gemini-2.0-flash")
+    if provider == "gemini":
+        model = os.getenv("LLM_MODEL", "gemini-2.5-flash")
         logger.info("Using Gemini LLM: %s", model)
         return GeminiLLM(model=model)
     else:
-        model = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+        # Default to Groq with openai/gpt-oss-120b
+        model = os.getenv("LLM_MODEL", "openai/gpt-oss-120b")
+        if model == "llama-3.3-70b-versatile":
+            model = "openai/gpt-oss-120b"
         logger.info("Using Groq LLM: %s", model)
         return GroqLLM(model=model)

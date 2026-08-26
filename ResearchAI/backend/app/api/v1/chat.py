@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_optional_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.services.rag.dependencies import get_pipeline
@@ -31,7 +31,7 @@ class ChatRequest(BaseModel):
 @router.post("/stream")
 async def stream_chat(
     req: ChatRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[Optional[User], Depends(get_optional_current_user)] = None,
 ):
     """
     SSE streaming chat endpoint.
@@ -77,7 +77,7 @@ async def stream_chat(
 @router.post("")
 async def chat(
     req: ChatRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[Optional[User], Depends(get_optional_current_user)] = None,
 ):
     """Non-streaming chat — returns full response at once."""
     if req.mode not in EXPLANATION_MODES:
