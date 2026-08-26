@@ -32,6 +32,15 @@ async def lifespan(app: FastAPI):
         # Dev-only: auto-create all tables from ORM models (no migration needed)
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+    else:
+        # Self-healing check for new columns in production PostgreSQL
+        try:
+            from sqlalchemy import text
+            async with engine.begin() as conn:
+                await conn.execute(text("ALTER TABLE papers ADD COLUMN IF NOT EXISTS napkin_visuals TEXT;"))
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Startup column check note: %s", e)
 
     # Initialize RAG pipeline (loads embedding model, connects to Qdrant)
     from app.services.rag.dependencies import init_rag

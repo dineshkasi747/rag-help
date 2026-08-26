@@ -64,6 +64,7 @@ async def run_async_migrations() -> None:
         # Prevent hanging forever if there's a zombie lock on the database
         await connection.execute(text("SET lock_timeout = '10s'"))
         await connection.run_sync(do_run_migrations)
+        await connection.commit()
     await connectable.dispose()
 
 
