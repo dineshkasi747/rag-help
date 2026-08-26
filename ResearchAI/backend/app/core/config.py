@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     upload_dir: str = Field("./uploads", validation_alias="UPLOAD_DIR")
     napkin_api_token: str = Field("", validation_alias="NAPKIN_API_TOKEN")
 
+    # Cloudinary Cloud Storage Config
+    cloudinary_cloud_name: str = Field("dspqls1bx", validation_alias="CLOUDINARY_CLOUD_NAME")
+    cloudinary_api_key: str = Field("641449344855465", validation_alias="CLOUDINARY_API_KEY")
+    cloudinary_api_secret: str = Field("haVMFGgmT5qMb5kobTT4gn-L98k", validation_alias="CLOUDINARY_API_SECRET")
+
     model_config = {"env_file": str(BASE_DIR / ".env"), "case_sensitive": True, "extra": "ignore"}
 
     @model_validator(mode='after')

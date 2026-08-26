@@ -62,14 +62,25 @@ class PaperService:
                 message="Duplicate: paper already exists in the library.",
             )
 
-        # Save file to disk
-        storage_path = self._save_file(sha256, content, file.filename or "upload.pdf")
+        # Save file to local disk cache
+        local_path = self._save_file(sha256, content, file.filename or "upload.pdf")
+        storage_path = str(local_path)
+
+        # Upload file to Cloudinary for permanent cloud storage and CDN delivery
+        try:
+            from app.services.cloudinary_service import cloudinary_service
+            cloud_res = cloudinary_service.upload_pdf(content, filename=file.filename, public_id=sha256)
+            if cloud_res.get("secure_url"):
+                storage_path = cloud_res["secure_url"]
+                logger.info("Uploaded paper %s to Cloudinary: %s", file.filename, storage_path)
+        except Exception as cloud_e:
+            logger.warning("Cloudinary upload error, using local storage fallback: %s", cloud_e)
 
         # Persist skeleton row — status=PENDING
         paper = Paper(
             sha256_hash=sha256,
             original_filename=file.filename or "upload.pdf",
-            storage_path=str(storage_path),
+            storage_path=storage_path,
             file_size_bytes=len(content),
             status="pending",
         )
@@ -101,7 +112,7 @@ class PaperService:
 
             await repo.update_status(paper_id, "processing")
             try:
-                parsed = _parser.parse(Path(paper.storage_path))
+                parsed = _parser.parse(paper.storage_path)
 
                 # Persist metadata
                 await repo.update_metadata(
@@ -217,7 +228,7 @@ class PaperService:
         # Self-healing: if paper has 0 sections in DB, try re-parsing from storage_path
         if not sections and paper.storage_path:
             try:
-                parsed = _parser.parse(Path(paper.storage_path))
+                parsed = _parser.parse(paper.storage_path)
                 if parsed.sections:
                     sec_rows = [
                         Section(

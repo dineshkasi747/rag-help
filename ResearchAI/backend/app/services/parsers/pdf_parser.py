@@ -21,7 +21,7 @@ import json
 import logging
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Union
 
 try:
     import fitz  # PyMuPDF
@@ -107,11 +107,30 @@ class PDFParser:
     # Font-size delta above median to count as a heading
     HEADING_SIZE_THRESHOLD = 1.15
 
-    def parse(self, pdf_path: Path) -> ParsedPaper:
-        logger.info("Parsing PDF: %s", pdf_path)
+    def parse(self, pdf_input: Union[Path, str, bytes]) -> ParsedPaper:
+        logger.info("Parsing PDF: %s", type(pdf_input))
+        doc = None
+        raw_bytes = None
+
+        if isinstance(pdf_input, str) and (pdf_input.startswith("http://") or pdf_input.startswith("https://")):
+            import urllib.request
+            try:
+                req = urllib.request.Request(pdf_input, headers={"User-Agent": "ResearchMind/1.0"})
+                with urllib.request.urlopen(req) as resp:
+                    raw_bytes = resp.read()
+            except Exception as e:
+                logger.error("Failed to download PDF from Cloudinary URL %s: %s", pdf_input, e)
+                raise e
+        elif isinstance(pdf_input, bytes):
+            raw_bytes = pdf_input
+
         if fitz is not None:
             try:
-                doc = fitz.open(str(pdf_path))
+                if raw_bytes is not None:
+                    doc = fitz.open(stream=raw_bytes, filetype="pdf")
+                else:
+                    doc = fitz.open(str(pdf_input))
+
                 page_count = len(doc)
 
                 blocks = self._extract_blocks(doc)
@@ -152,11 +171,17 @@ class PDFParser:
             except Exception as exc:
                 logger.warning("fitz parsing failed (%s). Falling back to pypdf...", exc)
 
-        return self._parse_pypdf(pdf_path)
+        return self._parse_pypdf(pdf_input if raw_bytes is None else raw_bytes)
 
-    def _parse_pypdf(self, pdf_path: Path) -> ParsedPaper:
+    def _parse_pypdf(self, pdf_input: Union[Path, str, bytes]) -> ParsedPaper:
         import pypdf
-        reader = pypdf.PdfReader(str(pdf_path))
+        import io
+        if isinstance(pdf_input, bytes):
+            reader = pypdf.PdfReader(io.BytesIO(pdf_input))
+            fallback_title = "Document"
+        else:
+            reader = pypdf.PdfReader(str(pdf_input))
+            fallback_title = Path(str(pdf_input)).stem if not str(pdf_input).startswith("http") else "Cloudinary Document"
         page_count = len(reader.pages)
         page_texts = [page.extract_text() or "" for page in reader.pages]
         raw_text = "\n\n".join(page_texts)

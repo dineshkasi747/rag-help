@@ -353,6 +353,23 @@ class NapkinService:
         mindmap_uri = self._build_svg_findings_mindmap(clean_title, struct.get("findings_mindmap", {}))
         architecture_uri = self._build_svg_system_architecture(clean_title, struct.get("system_architecture", {}))
 
+        # Upload diagrams to Cloudinary for permanent global CDN delivery
+        try:
+            from app.services.cloudinary_service import cloudinary_service
+            import hashlib
+            h_base = hashlib.sha256(clean_title.encode()).hexdigest()[:12]
+            flow_up = cloudinary_service.upload_svg(flowchart_uri, public_id=f"flowchart_{h_base}")
+            mm_up = cloudinary_service.upload_svg(mindmap_uri, public_id=f"mindmap_{h_base}")
+            arch_up = cloudinary_service.upload_svg(architecture_uri, public_id=f"arch_{h_base}")
+            if flow_up.get("secure_url"):
+                flowchart_uri = flow_up["secure_url"]
+            if mm_up.get("secure_url"):
+                mindmap_uri = mm_up["secure_url"]
+            if arch_up.get("secure_url"):
+                architecture_uri = arch_up["secure_url"]
+        except Exception as e:
+            logger.warning("Cloudinary SVG upload skipped: %s", e)
+
         return [
             {
                 "url": flowchart_uri,
