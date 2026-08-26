@@ -47,6 +47,19 @@ async def run_async_migrations() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    
+    # Attempt to kill any zombie connections that might be holding locks
+    try:
+        async with connectable.connect() as conn:
+            # Kill all other connections to the same database to release zombie locks
+            await conn.execute(text(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = current_database() AND pid <> pg_backend_pid()"
+            ))
+            await conn.commit()
+    except Exception as e:
+        print(f"Warning: could not kill zombie connections: {e}")
+
     async with connectable.connect() as connection:
         # Prevent hanging forever if there's a zombie lock on the database
         await connection.execute(text("SET lock_timeout = '10s'"))
