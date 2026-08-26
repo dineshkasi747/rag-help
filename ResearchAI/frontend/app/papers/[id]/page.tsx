@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import AppShell from "../../components/AppShell";
 import { 
   ArrowLeft, 
@@ -19,7 +19,11 @@ import {
   Image,
   ZoomIn,
   X,
-  RefreshCw
+  RefreshCw,
+  Workflow,
+  BrainCircuit,
+  GitBranch,
+  ArrowRight
 } from "lucide-react";
 
 import { API_URL as API } from "../../config";
@@ -66,7 +70,9 @@ interface PaperSummary {
 export default function PaperDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const initialTab = searchParams.get("tab");
   
   const [paper, setPaper] = useState<Paper | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
@@ -74,7 +80,9 @@ export default function PaperDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"summary" | "sections" | "visuals">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "sections" | "visuals">(
+    initialTab === "visuals" || initialTab === "sections" ? initialTab : "summary"
+  );
 
   // Napkin AI Visuals
   interface NapkinVisual { url: string; format: string; label: string; }
@@ -348,6 +356,33 @@ export default function PaperDetailsPage() {
         {/* TAB 1: AI VISUAL SUMMARY */}
         {activeTab === "summary" && (
           <div className="space-y-6">
+            {/* Visual Diagrams Spotlight Banner */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl bg-gradient-to-r from-[#7a4aff]/25 via-[#d946ef]/15 to-slate-900/60 border-2 border-[#7a4aff]/40 shadow-xl backdrop-blur-md">
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-[#7a4aff] to-[#d946ef] text-white shadow-md">
+                  <Workflow className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm sm:text-base font-black text-white">Napkin AI Visual Diagrams</p>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-extrabold uppercase">
+                      Interactive SVGs
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/60 mt-0.5">
+                    Flowcharts, concept mindmaps &amp; architecture diagrams generated from this paper.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveTab("visuals")}
+                className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#7a4aff] to-[#d946ef] hover:from-[#6b38ef] hover:to-[#c026d3] text-white text-xs font-bold transition-all shadow-lg shadow-purple-900/40 hover:scale-105 cursor-pointer shrink-0"
+              >
+                <span>Explore Visuals</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
             {/* Executive Summary Banner */}
             <div className="bg-gradient-to-r from-[#a855f7] via-[#9333ea] to-[#d946ef] rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white/80 mb-2">
