@@ -18,7 +18,7 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.paper import Paper, ProcessingStatus, Section
+from app.models.paper import Paper, Section
 from app.repositories.paper_repository import PaperRepository
 from app.schemas.paper import PaperUploadResponse
 from app.services.parsers.pdf_parser import PDFParser
@@ -152,7 +152,7 @@ class PaperService:
                     logger.warning("RAG indexing failed for paper_id=%s: %s", paper_id, rag_exc)
                     # Don't fail the whole processing — RAG is additive
 
-                await repo.update_status(paper_id, ProcessingStatus.COMPLETED)
+                await repo.update_status(paper_id, "completed")
                 logger.info("paper_id=%s processed successfully (%d sections)", paper_id, len(section_rows))
 
                 # Napkin AI: generate visual diagrams from paper content (additive — won't fail processing)
@@ -180,6 +180,7 @@ class PaperService:
                 except Exception as napkin_exc:
                     logger.warning("Napkin visual generation failed for paper_id=%s: %s", paper_id, napkin_exc)
                 
+                # Done!
                 await repo.update_status(paper_id, "completed")
                 logger.info("process_paper: finished paper_id=%s", paper_id)
 
