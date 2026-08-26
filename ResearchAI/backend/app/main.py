@@ -19,12 +19,19 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: ensure DB tables exist (creates SQLite or Postgres schema automatically)
+    # Schema management:
+    #   - LOCAL (SQLite): create_all is used for zero-config dev convenience.
+    #   - PRODUCTION (Render Postgres): schema is managed by Alembic migrations.
+    #     Run: alembic upgrade head   before deploying or in the Render start command.
     from app.db.session import engine
     from app.db.base import Base
     from app.models import User, Paper, Section  # noqa: F401
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    from app.core.config import settings as _s
+
+    if "sqlite" in _s.database_url:
+        # Dev-only: auto-create all tables from ORM models (no migration needed)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
     # Initialize RAG pipeline (loads embedding model, connects to Qdrant)
     from app.services.rag.dependencies import init_rag
@@ -52,7 +59,11 @@ app.add_middleware(
         "http://localhost:8000",
         "http://127.0.0.1:8000",
         "http://localhost:8181",
-        "http://127.0.0.1:8181"
+        "http://127.0.0.1:8181",
+        # Vercel production frontend
+        "https://rag-help-nlvk-one.vercel.app",
+        # Render backend (self + any preview URLs)
+        "https://rag-help.onrender.com",
     ],
     allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.onrender\.com)(:\d+)?",
     allow_credentials=True,
