@@ -33,7 +33,11 @@ class Paper(Base):
 
     # Processing lifecycle
     status = Column(
-        Enum(ProcessingStatus, name="processing_status_enum"),
+        Enum(
+            ProcessingStatus, 
+            name="processing_status_enum",
+            values_callable=lambda obj: [e.value for e in obj]
+        ),
         nullable=False,
         default=ProcessingStatus.PENDING,
     )
@@ -53,6 +57,10 @@ class Paper(Base):
     # Timestamps
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     processed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Napkin AI generated visual diagram URLs (JSON array of {url, format} objects)
+    napkin_visuals = Column(Text, nullable=True)
+
 
     # Relationships (populated in later milestones)
     sections = relationship("Section", back_populates="paper", cascade="all, delete-orphan")
