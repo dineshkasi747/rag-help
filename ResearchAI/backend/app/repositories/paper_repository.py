@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.paper import Paper, Section
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
