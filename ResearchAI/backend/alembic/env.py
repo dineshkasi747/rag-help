@@ -3,7 +3,7 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
@@ -48,6 +48,8 @@ async def run_async_migrations() -> None:
         poolclass=pool.NullPool,
     )
     async with connectable.connect() as connection:
+        # Prevent hanging forever if there's a zombie lock on the database
+        await connection.execute(text("SET lock_timeout = '10s'"))
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
 
