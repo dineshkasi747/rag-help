@@ -192,30 +192,41 @@ class PDFParser:
         )
 
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Block extraction
     # ------------------------------------------------------------------
 
     def _extract_blocks(self, doc: "fitz.Document") -> list[TextBlock]:
         blocks: list[TextBlock] = []
         for page_num, page in enumerate(doc, start=1):
-            raw_blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
-            for block in raw_blocks:
-                if block.get("type") != 0:  # skip image blocks
-                    continue
-                for line in block.get("lines", []):
-                    for span in line.get("spans", []):
-                        text = span["text"].strip()
-                        if not text:
-                            continue
-                        blocks.append(
-                            TextBlock(
-                                text=text,
-                                font_size=round(span["size"], 2),
-                                is_bold=bool(span["flags"] & 2**4),
-                                page=page_num,
-                                bbox=tuple(span["bbox"]),
-                            )
+            raw_blocks = page.get_text("blocks")
+            for b in raw_blocks:
+                if len(b) >= 5 and b[4].strip():
+                    text = b[4].strip()
+                    # Estimate font size and boldness from dict spans if available
+                    font_size = 11.0
+                    is_bold = False
+                    try:
+                        dict_data = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+                        for d_block in dict_data.get("blocks", []):
+                            for line in d_block.get("lines", []):
+                                for span in line.get("spans", []):
+                                    if span["text"].strip() and span["text"] in text:
+                                        font_size = round(span["size"], 2)
+                                        is_bold = bool(span["flags"] & 2**4)
+                                        break
+                    except Exception:
+                        pass
+
+                    blocks.append(
+                        TextBlock(
+                            text=text,
+                            font_size=font_size,
+                            is_bold=is_bold,
+                            page=page_num,
+                            bbox=(b[0], b[1], b[2], b[3]),
                         )
+                    )
         return blocks
 
     def _median_font_size(self, blocks: list[TextBlock]) -> float:
@@ -242,32 +253,62 @@ class PDFParser:
         def flush():
             nonlocal order
             if buffer:
-                sections.append(
-                    ExtractedSection(
-                        section_type=current_type,
-                        heading=current_heading,
-                        content=" ".join(buffer).strip(),
-                        page_number=start_page,
-                        order_index=order,
+                content = "\n\n".join(buffer).strip()
+                if content:
+                    sections.append(
+                        ExtractedSection(
+                            section_type=current_type,
+                            heading=current_heading or f"Section {order + 1}",
+                            content=content,
+                            page_number=start_page,
+                            order_index=order,
+                        )
                     )
-                )
-                order += 1
+                    order += 1
                 buffer.clear()
 
         for block in blocks:
+            # Check if block is a section header (e.g. "1. Introduction", "Abstract", "3. Methodology", etc.)
+            lines = block.text.split("\n")
+            first_line = lines[0].strip() if lines else block.text
+            
             is_heading = (
-                block.font_size >= heading_threshold or block.is_bold
-            ) and len(block.text.split()) <= 12
+                (block.font_size >= heading_threshold or block.is_bold)
+                and len(first_line.split()) <= 12
+            ) or any(
+                re.match(rf"^(?:\d+\.?\s*)?{kw}\b", first_line, re.IGNORECASE)
+                for kw_list in _SECTION_KEYWORDS.values()
+                for kw in kw_list
+            )
 
             if is_heading:
                 flush()
-                current_heading = block.text
-                current_type = _classify_section(block.text)
+                current_heading = first_line
+                current_type = _classify_section(first_line)
                 start_page = block.page
+                # If block had body text after heading, add it to buffer
+                if len(lines) > 1:
+                    buffer.append("\n".join(lines[1:]))
             else:
                 buffer.append(block.text)
 
         flush()
+
+        # Fallback: if fewer than 2 sections formed, break blocks by paragraphs
+        if len(sections) < 2 and blocks:
+            sections.clear()
+            for idx, block in enumerate(blocks):
+                stype = _classify_section(block.text[:60])
+                sections.append(
+                    ExtractedSection(
+                        section_type=stype if stype != "body" else ("introduction" if idx == 0 else "methodology" if idx == 1 else "results" if idx == 2 else "conclusion"),
+                        heading=f"Section {idx + 1}",
+                        content=block.text,
+                        page_number=block.page,
+                        order_index=idx,
+                    )
+                )
+
         return sections
 
     # ------------------------------------------------------------------

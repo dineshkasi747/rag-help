@@ -176,7 +176,35 @@ export default function Spatial3DViewer({ paperId }: { paperId: number }) {
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-slate-900/60 border border-slate-800 rounded-2xl">
         <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-sm font-semibold text-slate-300">Initializing Open3D Spatial Vector Topology...</p>
+      </div>
+    );
+  }
+
+  if (points.length === 0) {
+    return (
+      <div className="p-8 bg-slate-900/60 border border-slate-800 rounded-2xl text-center space-y-3">
+        <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+          <Box className="w-6 h-6" />
+        </div>
+        <h4 className="text-sm font-bold text-white">3D Spatial Vector Topology</h4>
+        <p className="text-xs text-slate-400 max-w-md mx-auto">
+          No 3D spatial points found for this document. Upload a research PDF or re-extract sections to populate the 3D vector manifold.
+        </p>
+        <button
+          onClick={() => {
+            setLoading(true);
+            fetch(`${API_BASE_URL}/papers/${paperId}/embeddings-projection`)
+              .then((r) => r.json())
+              .then((d) => {
+                setPoints(d.points || []);
+                setLoading(false);
+              })
+              .catch(() => setLoading(false));
+          }}
+          className="px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition cursor-pointer"
+        >
+          Refresh 3D Manifold
+        </button>
       </div>
     );
   }

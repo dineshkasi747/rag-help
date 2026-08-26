@@ -60,6 +60,35 @@ export default function UploadPage() {
   const [svgMap, setSvgMap] = useState<Record<string, string>>({});
   const [fullscreenVisual, setFullscreenVisual] = useState<NapkinVisual | null>(null);
 
+  // Load latest papers on mount so studio displays immediately
+  useEffect(() => {
+    async function loadInitial() {
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const res = await fetch(`${API}/papers/?page=1&page_size=10`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const items = Array.isArray(data) ? data : data.items || [];
+          if (items.length > 0) {
+            // Find first completed paper or latest
+            const target = items.find((p: any) => p.status === "completed") || items[0];
+            if (target && !activePaperId) {
+              setActivePaperId(target.id);
+              setActivePaperName(target.metadata?.title || target.original_filename);
+              fetchVisualsForPaper(target.id, target.metadata?.title || target.original_filename);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Initial papers load error:", e);
+      }
+    }
+    loadInitial();
+  }, []);
+
   const addFiles = (newFiles: FileList | File[]) => {
     const pdfs = Array.from(newFiles).filter((f) => f.type === "application/pdf");
     const entries: UploadedFile[] = pdfs.map((f) => ({
@@ -108,7 +137,6 @@ export default function UploadPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      // First try to fetch or generate visuals
       let res = await fetch(`${API}/papers/${paperId}/visuals`, { headers });
       let data = await res.json();
       let list = data.visuals || [];
@@ -126,19 +154,6 @@ export default function UploadPage() {
       if (list.length > 0) {
         setVisuals(list);
         await decodeSvg(list);
-      } else {
-        // If still pending, poll in 3 seconds
-        setTimeout(async () => {
-          try {
-            const retryRes = await fetch(`${API}/papers/${paperId}/visuals`, { headers });
-            const retryData = await retryRes.json();
-            const retryList = retryData.visuals || [];
-            if (retryList.length > 0) {
-              setVisuals(retryList);
-              await decodeSvg(retryList);
-            }
-          } catch {}
-        }, 3000);
       }
     } catch (err) {
       setVisualsError("Visual diagrams are being synthesized. Click Refresh below.");
@@ -149,7 +164,7 @@ export default function UploadPage() {
 
   const uploadFile = async (entry: UploadedFile) => {
     setFiles((prev) =>
-      prev.map((f) => (f.id === entry.id ? { ...f, status: "uploading", progress: 10 } : f))
+      prev.map((f) => (f.id === entry.id ? { ...f, status: "uploading", progress: 15 } : f))
     );
 
     const formData = new FormData();
@@ -160,11 +175,11 @@ export default function UploadPage() {
         setFiles((prev) =>
           prev.map((f) =>
             f.id === entry.id && f.progress < 85
-              ? { ...f, progress: f.progress + 15 }
+              ? { ...f, progress: f.progress + 10 }
               : f
           )
         );
-      }, 300);
+      }, 400);
 
       const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
       const headers: Record<string, string> = {};
@@ -200,16 +215,35 @@ export default function UploadPage() {
                 ...f,
                 status: isDuplicate ? "duplicate" : "done",
                 progress: 100,
-                message: data.message,
+                message: data.message || "PDF uploaded. Synthesizing visual diagrams...",
                 paperId: paperId,
               }
             : f
         )
       );
 
-      // IMMEDIATELY TRIGGER & SHOW VISUALIZATIONS
+      // Poll until background parsing completes, then load real visuals
       if (paperId) {
-        fetchVisualsForPaper(paperId, entry.file.name);
+        setActivePaperId(paperId);
+        setActivePaperName(entry.file.name);
+        setVisualsLoading(true);
+
+        let attempts = 0;
+        const poll = setInterval(async () => {
+          attempts += 1;
+          try {
+            const checkRes = await fetch(`${API}/papers/${paperId}`, { headers });
+            if (checkRes.ok) {
+              const checkData = await checkRes.json();
+              if (checkData.status === "completed" || attempts >= 8) {
+                clearInterval(poll);
+                fetchVisualsForPaper(paperId, checkData.metadata?.title || entry.file.name);
+              }
+            }
+          } catch {
+            if (attempts >= 8) clearInterval(poll);
+          }
+        }, 1200);
       }
     } catch (err) {
       setFiles((prev) =>

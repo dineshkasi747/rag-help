@@ -309,10 +309,33 @@ export default function UMAPEmbeddingViewer({ paperId }: { paperId: number }) {
     );
   }
 
-  if (error || !data) {
+  if (error || !data || data.total_chunks === 0 || !data.points || data.points.length === 0) {
     return (
-      <div className="p-6 bg-slate-900/60 border border-red-500/30 rounded-2xl text-center">
-        <p className="text-sm text-red-400">Failed to render embedding space: {error}</p>
+      <div className="p-8 bg-slate-900/60 border border-slate-800 rounded-2xl text-center space-y-3">
+        <div className="w-12 h-12 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center mx-auto">
+          <Sparkles className="w-6 h-6" />
+        </div>
+        <h4 className="text-sm font-bold text-white">UMAP Embedding Manifold</h4>
+        <p className="text-xs text-slate-400 max-w-md mx-auto">
+          {error
+            ? `Connection notice: ${error}`
+            : 'No semantic vector points found for this document. Upload a research paper with text sections to view the embedding clusters.'}
+        </p>
+        <button
+          onClick={() => {
+            setLoading(true);
+            fetch(`${API_BASE_URL}/papers/${paperId}/embeddings-projection`)
+              .then((r) => r.json())
+              .then((d) => {
+                setData(d);
+                setLoading(false);
+              })
+              .catch(() => setLoading(false));
+          }}
+          className="px-4 py-2 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-violet-300 text-xs font-bold transition cursor-pointer"
+        >
+          Refresh Embedding Space
+        </button>
       </div>
     );
   }

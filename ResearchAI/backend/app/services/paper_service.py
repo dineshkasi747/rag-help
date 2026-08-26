@@ -206,21 +206,45 @@ class PaperService:
         return await self._repo.get_system_stats()
 
     async def generate_and_save_visuals(self, paper_id: int) -> list[dict]:
-        """Generate and save Napkin / SVG visual diagrams for a paper on demand."""
+        """
+        Generate Napkin AI / dynamic SVG visuals using real paper content and save to DB.
+        """
         paper = await self._repo.get_by_id(paper_id)
         if not paper:
             return []
         sections = await self._repo.get_sections(paper_id)
 
+        # Self-healing: if paper has 0 sections in DB, try re-parsing from storage_path
+        if not sections and paper.storage_path:
+            try:
+                parsed = _parser.parse(Path(paper.storage_path))
+                if parsed.sections:
+                    sec_rows = [
+                        Section(
+                            paper_id=paper_id,
+                            section_type=s.section_type,
+                            heading=s.heading,
+                            content=s.content,
+                            page_number=s.page_number,
+                            order_index=s.order_index,
+                        )
+                        for s in parsed.sections
+                    ]
+                    await self._repo.create_sections(sec_rows)
+                    sections = await self._repo.get_sections(paper_id)
+            except Exception as parse_e:
+                logger.warning("Re-parse attempt for paper %s failed: %s", paper_id, parse_e)
+
         methodology_content = next(
-            (s.content for s in sections if s.section_type in ("methodology", "methods", "body", "introduction")),
+            (s.content for s in sections if s.section_type in ("methodology", "methods", "architecture", "body", "introduction")),
             None,
         )
         key_findings_list: list[str] = []
         if paper.abstract:
-            key_findings_list = [s.strip() for s in paper.abstract.split(".") if len(s.strip()) > 30][:4]
-
-        full_context_text = "\n\n".join([f"[{s.section_type}] {s.content}" for s in sections[:8]])
+            key_findings_list = [s.strip() for s in paper.abstract.split(".") if len(s.strip()) > 25][:4]
+        
+        # Include real section contents
+        full_context_text = "\n\n".join([f"[{s.section_type.upper()}] {s.content}" for s in sections[:10]])
 
         napkin = NapkinService()
         visuals = await napkin.generate_visuals_for_paper(
@@ -229,14 +253,14 @@ class PaperService:
             abstract=paper.abstract,
             methodology=methodology_content,
             key_findings=key_findings_list or None,
-            raw_text=full_context_text,
+            raw_text=full_context_text or methodology_content,
         )
         if visuals:
             await self._repo.save_napkin_visuals(paper_id, visuals)
         return visuals
 
     async def get_napkin_visuals(self, paper_id: int) -> list[dict]:
-        """Return the cached Napkin AI visuals for a paper, or generate dynamically if missing."""
+        """Return the cached Napkin AI visuals for a paper, or generate dynamically if missing or generic."""
         import json
         paper = await self._repo.get_by_id(paper_id)
         if not paper:
@@ -244,12 +268,21 @@ class PaperService:
         if paper.napkin_visuals:
             try:
                 parsed = json.loads(paper.napkin_visuals)
-                if parsed:
+                # Invalidate stale static placeholders
+                raw_v_str = str(parsed)
+                is_stale_placeholder = (
+                    "Problem Formulation" in raw_v_str
+                    or "Problem Framing" in raw_v_str
+                    or "Corpus &amp; Pipeline" in raw_v_str
+                    or "Corpus %26 Pipeline" in raw_v_str
+                    or "Tier 1: Data &amp; Input Layer" in raw_v_str
+                )
+                if parsed and not is_stale_placeholder:
                     return parsed
             except Exception:
                 pass
         
-        # If no visuals yet and paper exists, auto-generate them
+        # Auto-generate with real extracted sections
         return await self.generate_and_save_visuals(paper_id)
 
     async def generate_paper_summary(self, paper_id: int) -> dict:
@@ -332,7 +365,7 @@ class PaperService:
         from app.services.rag.dependencies import get_embedder
         from app.services.rag.projection_service import ProjectionService
 
-        chunker = SemanticChunker()
+        chunker = SemanticChunker(target_tokens=150, overlap_sentences=1)
         all_chunks = []
         for s in sections:
             s_chunks = chunker.chunk_section(
@@ -343,6 +376,19 @@ class PaperService:
                 page_number=s.page_number,
             )
             all_chunks.extend(s_chunks)
+
+        # Granular fallback if small document
+        if len(all_chunks) < 4 and sections:
+            finer = SemanticChunker(target_tokens=60, overlap_sentences=1)
+            all_chunks = []
+            for s in sections:
+                all_chunks.extend(finer.chunk_section(
+                    text=s.content,
+                    paper_id=paper_id,
+                    section_id=s.id,
+                    section_type=s.section_type,
+                    page_number=s.page_number,
+                ))
 
         if not all_chunks:
             return {"total_chunks": 0, "points": [], "clusters": [], "density_grid": []}

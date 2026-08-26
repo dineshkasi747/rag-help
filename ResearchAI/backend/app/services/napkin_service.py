@@ -222,26 +222,40 @@ class NapkinService:
             clean_json = raw_res.strip().replace("```json", "").replace("```", "").strip()
             return json.loads(clean_json)
         except Exception as e:
-            logger.warning("LLM visual extraction error: %s. Using heuristic extraction.", e)
-            return self._heuristic_structure_extraction(title, abstract, methodology, key_findings)
-
     def _heuristic_structure_extraction(
         self,
         title: Optional[str],
         abstract: Optional[str],
         methodology: Optional[str],
         key_findings: Optional[list[str]],
+        raw_text: Optional[str] = None,
     ) -> dict:
-        """Heuristic fallback that extracts real sentences and words if LLM is unavailable."""
-        clean_title = title or "Research Document"
-        sentences = [s.strip() for s in (abstract or "").split(".") if len(s.strip()) > 15]
+        """Heuristic fallback that extracts real sentences, domain entities, and words from the paper text."""
+        clean_title = title or "Research Paper Investigation"
+        all_text = f"{title or ''}\n{abstract or ''}\n{methodology or ''}\n{raw_text or ''}".strip()
         
-        f_list = key_findings or (sentences[:4] if len(sentences) >= 4 else [
-            "Empirical results demonstrated significant performance gains.",
-            "Novel architecture reduces computational latency.",
-            "Ablation studies confirm key algorithmic contribution.",
-            "Generalizable framework across multiple evaluation benchmarks."
-        ])
+        # Extract clean sentences
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", all_text) if len(s.strip()) > 20]
+        
+        # Extract real domain terms / acronyms (e.g., Transformer, BLEU, CNN, LSTM, BERT, WMT, etc.)
+        acronyms = list(dict.fromkeys(re.findall(r"\b[A-Z0-9\-]{2,12}\b", all_text)))
+        metrics = list(dict.fromkeys(re.findall(r"\b(?:\d+\.?\d*\s*(?:%|BLEU|accuracy|F1|loss|ms|s|epochs?|layers?))\b", all_text, re.IGNORECASE)))
+        
+        phase1_name = f"Data Ingestion & Preprocessing"
+        phase1_b1 = sentences[0][:38] if sentences else (acronyms[0] if acronyms else "Corpus tokenization")
+        phase1_b2 = sentences[1][:38] if len(sentences) > 1 else "Dataset normalization"
+
+        phase2_name = f"Architecture Pipeline"
+        phase2_b1 = f"Model: {clean_title[:32]}"
+        phase2_b2 = f"Components: {', '.join(acronyms[:2])}" if acronyms else "Multi-layer feature stack"
+
+        phase3_name = f"Optimization & Training"
+        phase3_b1 = sentences[2][:38] if len(sentences) > 2 else "Loss function minimization"
+        phase3_b2 = f"Hyperparameters & tuning"
+
+        phase4_name = f"Benchmark Evaluation"
+        phase4_b1 = f"Metric: {metrics[0]}" if metrics else (sentences[3][:38] if len(sentences) > 3 else "Evaluation verification")
+        phase4_b2 = f"Comparison: {sentences[-1][:38]}" if sentences else "Ablation results"
 
         return {
             "methodology_flow": {
@@ -249,69 +263,68 @@ class NapkinService:
                 "phases": [
                     {
                         "phase_num": 1,
-                        "name": "Problem Formulation",
-                        "bullets": [sentences[0][:35] if sentences else "Research context definition", "Baseline benchmark setup"],
+                        "name": phase1_name,
+                        "bullets": [phase1_b1, phase1_b2],
                         "tag": "INPUT",
-                        "description": (abstract or "Problem formulation and research objective.")[:90]
+                        "description": (sentences[0] if sentences else f"Input data processing for {clean_title}.")[:90]
                     },
                     {
                         "phase_num": 2,
-                        "name": "Data & Feature Pipeline",
-                        "bullets": ["Dataset preprocessing", "Feature vector extraction"],
+                        "name": phase2_name,
+                        "bullets": [phase2_b1, phase2_b2],
                         "tag": "PIPELINE",
-                        "description": (methodology or "Corpus ingestion and feature extraction.")[:90]
+                        "description": (sentences[1] if len(sentences) > 1 else f"Core pipeline implementation.")[:90]
                     },
                     {
                         "phase_num": 3,
-                        "name": "Core Methodology",
-                        "bullets": ["Algorithmic implementation", "Optimization parameters"],
-                        "tag": "MODEL",
-                        "description": "Multi-stage architecture and algorithmic execution."
+                        "name": phase3_name,
+                        "bullets": [phase3_b1, phase3_b2],
+                        "tag": "CORE",
+                        "description": (sentences[2] if len(sentences) > 2 else "Algorithmic optimization and training.")[:90]
                     },
                     {
                         "phase_num": 4,
-                        "name": "Empirical Evaluation",
-                        "bullets": [f_list[0][:35] if f_list else "Performance validation", "Ablation and comparative metrics"],
+                        "name": phase4_name,
+                        "bullets": [phase4_b1, phase4_b2],
                         "tag": "EVALUATION",
-                        "description": "Comprehensive benchmarking and validation."
+                        "description": (sentences[3] if len(sentences) > 3 else "Comprehensive benchmark evaluation.")[:90]
                     }
                 ]
             },
             "findings_mindmap": {
                 "central_topic": clean_title[:30],
                 "branches": [
-                    {"name": "Primary Findings", "bullets": [f_list[0][:40] if len(f_list) > 0 else "High accuracy"] },
-                    {"name": "Core Innovation", "bullets": [f_list[1][:40] if len(f_list) > 1 else "Novel algorithm"] },
-                    {"name": "Experimental Setup", "bullets": [f_list[2][:40] if len(f_list) > 2 else "Verified benchmarks"] },
-                    {"name": "Future Applications", "bullets": [f_list[3][:40] if len(f_list) > 3 else "Practical impact"] }
+                    {"name": "Performance & Metrics", "bullets": [metrics[0] if metrics else (sentences[0][:38] if sentences else "SOTA Benchmark"), sentences[1][:38] if len(sentences) > 1 else "High fidelity"] },
+                    {"name": "Core Innovation", "bullets": [clean_title[:38], f"Framework: {', '.join(acronyms[:2])}" if acronyms else "Novel method"] },
+                    {"name": "Empirical Findings", "bullets": [sentences[2][:38] if len(sentences) > 2 else "Ablation confirmed", sentences[3][:38] if len(sentences) > 3 else "Empirical gain"] },
+                    {"name": "Practical Impact", "bullets": [sentences[-1][:38] if sentences else "Generalizable architecture", "Deployment efficiency"] }
                 ]
             },
             "system_architecture": {
-                "title": f"{clean_title} Architecture",
+                "title": f"{clean_title} Overview",
                 "tiers": [
                     {
-                        "tier_name": "Tier 1: Data & Input Layer",
+                        "tier_name": "Tier 1: Data & Input Processing",
                         "blocks": [
-                            {"name": "Data Ingestion", "desc": "Raw input parsing and normalization"},
-                            {"name": "Feature Extraction", "desc": "Semantic tokenization and embeddings"},
-                            {"name": "Data Loader", "desc": "Batch pipeline processing"}
+                            {"name": "Input Ingestion", "desc": sentences[0][:38] if sentences else "Document parsing"},
+                            {"name": "Token / Feature Vector", "desc": f"Tokens & {acronyms[0]}" if acronyms else "Dense embeddings"},
+                            {"name": "Batch Loader", "desc": "Pipeline synchronization"}
                         ]
                     },
                     {
-                        "tier_name": "Tier 2: Processing & Neural Engine",
+                        "tier_name": "Tier 2: Algorithmic & Neural Engine",
                         "blocks": [
-                            {"name": "Core Model", "desc": clean_title[:40]},
-                            {"name": "Attention Mechanism", "desc": "Context-aware representations"},
-                            {"name": "Optimization", "desc": "Loss minimization and weight updates"}
+                            {"name": "Core Model Stack", "desc": clean_title[:38]},
+                            {"name": "Attention / Sub-layers", "desc": f"Layer mechanism {', '.join(acronyms[1:3])}" if len(acronyms) > 1 else "Contextual encoding"},
+                            {"name": "Optimization Objective", "desc": "Gradient backprop"}
                         ]
                     },
                     {
-                        "tier_name": "Tier 3: Output & Evaluation",
+                        "tier_name": "Tier 3: Inference & Evaluation Interface",
                         "blocks": [
-                            {"name": "Inference Engine", "desc": "Fast generation and classification"},
-                            {"name": "Evaluation Metrics", "desc": "Benchmark scoring and validation"},
-                            {"name": "Application API", "desc": "Downstream downstream query interface"}
-                        ]
+                            {"name": "Prediction Head", "desc": "Logits generation & decoding"},
+                            {"name": "Evaluation Metric", "desc": f"Result: {metrics[0]}" if metrics else "Benchmark validation"},
+                            {"name": "Output Artifacts", "desc": "Export & reporting"}
                     }
                 ]
             }

@@ -236,10 +236,33 @@ export default function GraphistryKnowledgeGraph({ paperId }: { paperId: number 
     );
   }
 
-  if (error || !data) {
+  if (error || !data || data.total_nodes === 0 || !data.nodes || data.nodes.length === 0) {
     return (
-      <div className="p-6 bg-slate-900/60 border border-red-500/30 rounded-2xl text-center">
-        <p className="text-sm text-red-400">Failed to render knowledge graph: {error}</p>
+      <div className="p-8 bg-slate-900/60 border border-slate-800 rounded-2xl text-center space-y-3">
+        <div className="w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto">
+          <Network className="w-6 h-6" />
+        </div>
+        <h4 className="text-sm font-bold text-white">Knowledge Graph Topology</h4>
+        <p className="text-xs text-slate-400 max-w-md mx-auto">
+          {error
+            ? `Connection notice: ${error}`
+            : 'No semantic entity relationships extracted yet for this document. Upload a full research PDF to generate a dynamic knowledge network.'}
+        </p>
+        <button
+          onClick={() => {
+            setLoading(true);
+            fetch(`${API_BASE_URL}/papers/${paperId}/knowledge-graph`)
+              .then((r) => r.json())
+              .then((d) => {
+                setData(d);
+                setLoading(false);
+              })
+              .catch(() => setLoading(false));
+          }}
+          className="px-4 py-2 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/30 text-cyan-300 text-xs font-bold transition cursor-pointer"
+        >
+          Refresh Graph Topology
+        </button>
       </div>
     );
   }
