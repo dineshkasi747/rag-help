@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import Sidebar from "./Sidebar";
 import TopHeader from "./TopHeader";
 import { useRouter } from "next/navigation";
@@ -9,6 +10,7 @@ import HandsLoader from "./HandsLoader";
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
+  const { theme } = useTheme();
   const router = useRouter();
   const [handsDone, setHandsDone] = useState(false);
 
@@ -38,8 +40,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <div 
       data-slot="sidebar-wrapper" 
-      className="group/sidebar-wrapper flex min-h-screen w-full relative overflow-x-hidden font-satoshi bg-cover bg-fixed bg-center"
-      style={{ backgroundImage: "url('/assets/saas-bg-BWWvkdaI.png')" }}
+      className="group/sidebar-wrapper flex min-h-screen w-full relative overflow-x-hidden font-satoshi bg-cover bg-fixed bg-center transition-colors duration-300"
+      style={
+        theme === "dark"
+          ? { backgroundImage: "url('/assets/saas-bg-BWWvkdaI.png')" }
+          : undefined
+      }
     >
       {/* Sidebar Rail */}
       <Sidebar />

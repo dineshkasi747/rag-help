@@ -1,10 +1,12 @@
 "use client";
 
-import { Search, Bell, CircleUser, PanelLeft } from "lucide-react";
+import { Search, Bell, CircleUser, PanelLeft, Sun, Moon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 export default function TopHeader() {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <header className="sticky top-0 z-50 flex h-14 sm:h-16 items-center gap-2 sm:gap-4 bg-gradient-to-r from-[#a855f7] via-[#9333ea] to-[#d946ef] backdrop-blur-md mx-2 sm:mx-4 md:mx-10 rounded-b-2xl px-3 sm:px-6 shadow-xl">
@@ -42,6 +44,20 @@ export default function TopHeader() {
 
       {/* Right Header Actions */}
       <div className="flex items-center gap-2">
+        {/* Theme Toggle Button (Dark / Light Mode) */}
+        <button
+          onClick={toggleTheme}
+          className="inline-flex items-center justify-center rounded-xl bg-white/15 hover:bg-white/25 text-white size-9 p-2 transition-all duration-300 hover:scale-105 border border-white/20 cursor-pointer shadow-sm"
+          title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
+          aria-label="Toggle Theme"
+        >
+          {theme === "dark" ? (
+            <Sun className="size-4.5 text-amber-300 transition-transform rotate-0 hover:rotate-45" />
+          ) : (
+            <Moon className="size-4.5 text-cyan-200 transition-transform rotate-0 hover:-rotate-12" />
+          )}
+        </button>
+
         {/* Mobile Search Button */}
         <button className="inline-flex items-center justify-center rounded-lg text-white hover:bg-white/10 size-9 md:hidden cursor-pointer">
           <Search className="size-5" />
