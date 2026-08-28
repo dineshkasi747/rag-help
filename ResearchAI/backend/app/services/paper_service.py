@@ -532,10 +532,46 @@ class PaperService:
             query_embedding=query_emb,
             existing_embeddings=embeddings,
             existing_points=base_proj.get("points", []),
+            top_k_neighbors=5,
         )
+
+        # Synthesize instant AI answer from the top retrieved 3D vector chunks
+        ai_answer = ""
+        key_insights = []
+        neighbors = query_result.get("neighbors", [])
+        if neighbors:
+            try:
+                from app.services.rag.llm_provider import get_llm
+                llm = get_llm()
+                context_passages = "\n\n".join([
+                    f"[Passage {i+1}: {n.get('target_section', 'section').upper()} (Similarity: {n.get('confidence_pct', 0)}%)]\n{n.get('full_text', n.get('text_preview', ''))}"
+                    for i, n in enumerate(neighbors[:4])
+                ])
+                prompt = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are an expert AI Research Scientist. Synthesize a concise, highly insightful, "
+                            "rigorous academic answer to the user's query based strictly on the retrieved 3D vector embedding chunks below.\n"
+                            "Format your answer with 2-3 clear, informative paragraphs highlighting exact mechanisms, formulas, and empirical findings.\n"
+                            "End with a dedicated 'Key Takeaways' section with 2-3 bullet points."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Paper Title: {paper.title or paper.original_filename}\nUser Query: {query}\n\nRetrieved 3D Embedding Chunks:\n{context_passages}"
+                    }
+                ]
+                ai_answer = await llm.complete(prompt)
+            except Exception as e:
+                logger.warning("Failed to generate AI answer for 3D query projection: %s", e)
+                ai_answer = f"Retrieved {len(neighbors)} highly relevant embedding chunks from {paper.title or paper.original_filename} matching your query."
+
         return {
             "paper_id": paper_id,
+            "paper_title": paper.title or paper.original_filename,
             "query": query,
+            "ai_answer": ai_answer,
             **query_result,
         }
 

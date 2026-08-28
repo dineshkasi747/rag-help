@@ -153,6 +153,7 @@ class ProjectionService:
                 "section_type": meta.get("section_type", "body"),
                 "page_number": meta.get("page_number", 1),
                 "text_preview": meta.get("text", "")[:140] + ("..." if len(meta.get("text", "")) > 140 else ""),
+                "full_text": meta.get("text", ""),
                 "token_estimate": meta.get("token_estimate", 100),
                 "x": norm_3d[i][0],
                 "y": norm_3d[i][1],
@@ -255,10 +256,13 @@ class ProjectionService:
             neighbors.append({
                 "target_id": pt["id"],
                 "target_section": pt["section_type"],
+                "page_number": pt.get("page_number", 1),
+                "cluster_label": pt.get("cluster_label", "Semantic Group"),
                 "similarity": round(float(sim), 4),
                 "confidence_pct": round(float(sim) * 100, 1),
                 "target_pos": {"x": pt["x"], "y": pt["y"], "z": pt["z"]},
                 "text_preview": pt.get("text_preview", ""),
+                "full_text": pt.get("full_text", pt.get("text_preview", "")),
             })
 
         return {

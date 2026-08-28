@@ -99,6 +99,18 @@ export default function PaperVisualizationStudio({
       {/* Primary Paradigm Tabs Switcher */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-950/80 border border-slate-800/80">
         <button
+          onClick={() => setActiveTab('spatial3d')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition ${
+            activeTab === 'spatial3d'
+              ? 'bg-gradient-to-r from-cyan-600 to-violet-600 text-white shadow-lg shadow-cyan-600/30'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Box className="w-4 h-4" />
+          1. 3D Semantic Cosmos &amp; Vector Search
+        </button>
+
+        <button
           onClick={() => setActiveTab('umap')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition ${
             activeTab === 'umap'
@@ -107,7 +119,7 @@ export default function PaperVisualizationStudio({
           }`}
         >
           <Sparkles className="w-4 h-4" />
-          1. Datashader + UMAP Manifold
+          2. Datashader + UMAP Manifold
         </button>
 
         <button
@@ -119,19 +131,7 @@ export default function PaperVisualizationStudio({
           }`}
         >
           <Network className="w-4 h-4" />
-          2. Graphistry Knowledge Graph
-        </button>
-
-        <button
-          onClick={() => setActiveTab('spatial3d')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition ${
-            activeTab === 'spatial3d'
-              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Box className="w-4 h-4" />
-          3. Open3D Section Topology
+          3. Graphistry Knowledge Network
         </button>
 
         <button
