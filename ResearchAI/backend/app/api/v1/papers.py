@@ -179,6 +179,33 @@ async def get_paper_knowledge_graph(paper_id: int, service: PaperService = Depen
     return await service.get_knowledge_graph(paper_id)
 
 
+class ExplainNodeRequest(BaseModel):
+    node_name: str
+    category: str
+    description: Optional[str] = None
+
+
+@router.post("/{paper_id}/knowledge-graph/explain-node")
+async def explain_knowledge_node(
+    paper_id: int,
+    req: ExplainNodeRequest,
+    service: PaperService = Depends(_get_service),
+):
+    """
+    Generate an exhaustive, publication-grade academic deep-dive explanation for any entity clicked in the graph.
+    """
+    paper = await service.get_paper(paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="Paper not found.")
+    return await service.explain_knowledge_node(
+        paper_id=paper_id,
+        node_name=req.node_name,
+        category=req.category,
+        description=req.description,
+    )
+
+
+
 
 # ---------------------------------------------------------------------------
 # Helpers

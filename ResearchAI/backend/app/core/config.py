@@ -26,8 +26,8 @@ class Settings(BaseSettings):
 
     # Cloudinary Cloud Storage Config
     cloudinary_cloud_name: str = Field("dspqls1bx", validation_alias="CLOUDINARY_CLOUD_NAME")
-    cloudinary_api_key: str = Field("641449344855465", validation_alias="CLOUDINARY_API_KEY")
-    cloudinary_api_secret: str = Field("haVMFGgmT5qMb5kobTT4gn-L98k", validation_alias="CLOUDINARY_API_SECRET")
+    cloudinary_api_key: str = Field("119591412111292", validation_alias="CLOUDINARY_API_KEY")
+    cloudinary_api_secret: str = Field("hFakgbYtDywqE7D7OeiAOVnxdRo", validation_alias="CLOUDINARY_API_SECRET")
 
     model_config = {"env_file": str(BASE_DIR / ".env"), "case_sensitive": True, "extra": "ignore"}
 

@@ -23,7 +23,8 @@ import {
   Maximize2,
   GitBranch,
   BrainCircuit,
-  Workflow
+  Workflow,
+  Cloud
 } from "lucide-react";
 
 import { API_URL as API } from "../config";
@@ -53,6 +54,7 @@ export default function UploadPage() {
   // Active visualization state for the most recently uploaded/selected paper
   const [activePaperId, setActivePaperId] = useState<number | null>(null);
   const [activePaperName, setActivePaperName] = useState<string>("");
+  const [studioKey, setStudioKey] = useState<number>(0);
   const [visuals, setVisuals] = useState<NapkinVisual[]>([]);
   const [visualsLoading, setVisualsLoading] = useState(false);
   const [visualsError, setVisualsError] = useState("");
@@ -68,7 +70,7 @@ export default function UploadPage() {
         const headers: Record<string, string> = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
 
-        const res = await fetch(`${API}/papers/?page=1&page_size=10`, { headers });
+        const res = await fetch(`${API}/papers?skip=0&limit=50`, { headers });
         if (res.ok) {
           const data = await res.json();
           const items = Array.isArray(data) ? data : data.items || [];
@@ -78,6 +80,7 @@ export default function UploadPage() {
             if (target && !activePaperId) {
               setActivePaperId(target.id);
               setActivePaperName(target.metadata?.title || target.original_filename);
+              setStudioKey(Date.now());
               fetchVisualsForPaper(target.id, target.metadata?.title || target.original_filename);
             }
           }
@@ -90,7 +93,7 @@ export default function UploadPage() {
   }, []);
 
   const addFiles = (newFiles: FileList | File[]) => {
-    const pdfs = Array.from(newFiles).filter((f) => f.type === "application/pdf");
+    const pdfs = Array.from(newFiles).filter((f) => f.type === "application/pdf" || f.name.endsWith(".pdf"));
     const entries: UploadedFile[] = pdfs.map((f) => ({
       file: f,
       id: crypto.randomUUID(),
@@ -128,6 +131,7 @@ export default function UploadPage() {
   const fetchVisualsForPaper = async (paperId: number, paperTitle: string) => {
     setActivePaperId(paperId);
     setActivePaperName(paperTitle);
+    setStudioKey(Date.now());
     setVisualsLoading(true);
     setVisualsError("");
     setSelectedDiagramIndex(0);
@@ -164,7 +168,7 @@ export default function UploadPage() {
 
   const uploadFile = async (entry: UploadedFile) => {
     setFiles((prev) =>
-      prev.map((f) => (f.id === entry.id ? { ...f, status: "uploading", progress: 15 } : f))
+      prev.map((f) => (f.id === entry.id ? { ...f, status: "uploading", progress: 20 } : f))
     );
 
     const formData = new FormData();
@@ -175,11 +179,11 @@ export default function UploadPage() {
         setFiles((prev) =>
           prev.map((f) =>
             f.id === entry.id && f.progress < 85
-              ? { ...f, progress: f.progress + 10 }
+              ? { ...f, progress: f.progress + 15 }
               : f
           )
         );
-      }, 400);
+      }, 350);
 
       const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
       const headers: Record<string, string> = {};
@@ -215,19 +219,27 @@ export default function UploadPage() {
                 ...f,
                 status: isDuplicate ? "duplicate" : "done",
                 progress: 100,
-                message: data.message || "PDF uploaded. Synthesizing visual diagrams...",
+                message: data.message || "PDF uploaded to Cloudinary. Generating visual manifolds & knowledge graph...",
                 paperId: paperId,
               }
             : f
         )
       );
 
-      // Poll until background parsing completes, then load real visuals
+      // Immediately activate studio for the uploaded paper
       if (paperId) {
         setActivePaperId(paperId);
         setActivePaperName(entry.file.name);
+        setStudioKey(Date.now());
         setVisualsLoading(true);
 
+        // Smooth scroll to studio
+        const studioEl = document.getElementById("visualization-studio");
+        if (studioEl) {
+          studioEl.scrollIntoView({ behavior: "smooth" });
+        }
+
+        // Poll until background parsing completes, then reload visuals
         let attempts = 0;
         const poll = setInterval(async () => {
           attempts += 1;
@@ -264,7 +276,13 @@ export default function UploadPage() {
 
   const pendingCount = files.filter((f) => f.status === "pending").length;
 
-  const currentVisual = visuals[selectedDiagramIndex] || visuals[0];
+  const handleSelectPaperToVisualize = (pId: number, pName: string) => {
+    fetchVisualsForPaper(pId, pName);
+    const studioEl = document.getElementById("visualization-studio");
+    if (studioEl) {
+      studioEl.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   return (
     <AppShell>
@@ -272,11 +290,15 @@ export default function UploadPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Upload &amp; Auto-Visualize Research Paper
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
+              Upload &amp; Auto-Visualize Research Papers
+              <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold flex items-center gap-1">
+                <Cloud className="w-3.5 h-3.5" />
+                Cloudinary Storage
+              </span>
             </h1>
             <p className="mt-1 text-slate-400 text-xs sm:text-sm">
-              Upload any PDF paper to instantly generate Napkin AI visual flowcharts, mindmaps &amp; architectures.
+              Upload single or multiple research PDFs to synthesize UMAP embedding manifolds, interactive Graphistry knowledge networks &amp; Napkin AI visuals.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -294,7 +316,7 @@ export default function UploadPage() {
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-xs font-bold hover:bg-white/20 transition-all cursor-pointer"
             >
               <BarChart3 className="w-4 h-4 text-emerald-400" />
-              <span>View All Analytics</span>
+              <span>System Analytics</span>
             </Link>
           </div>
         </div>
@@ -302,19 +324,30 @@ export default function UploadPage() {
         {/* ========================================================================= */}
         {/* SECTION 1: INSTANT MULTI-PARADIGM VISUALIZATION STUDIO */}
         {/* ========================================================================= */}
-        {activePaperId && (
-          <div className="space-y-4">
+        <div id="visualization-studio" className="space-y-4">
+          {activePaperId ? (
             <PaperVisualizationStudio
+              key={`studio-${activePaperId}-${studioKey}`}
               paperId={activePaperId}
               title={activePaperName}
               visuals={visuals}
               defaultTab="umap"
             />
-          </div>
-        )}
+          ) : (
+            <div className="p-12 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-3 backdrop-blur-xl">
+              <div className="w-12 h-12 rounded-2xl bg-violet-600/20 border border-violet-500/30 text-violet-400 flex items-center justify-center mx-auto">
+                <BrainCircuit className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-white">Visual Analytics &amp; RAG Studio</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Upload a research paper PDF below to unlock UMAP embedding manifolds, interactive Graphistry networks, 3D section topologies, and Napkin AI diagrams.
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* ========================================================================= */}
-        {/* SECTION 2: PDF UPLOAD DROP ZONE */}
+        {/* SECTION 2: PDF UPLOAD DROP ZONE (MULTIPLE FILES AT ONCE) */}
         {/* ========================================================================= */}
         <div
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
@@ -335,11 +368,11 @@ export default function UploadPage() {
           </div>
           <div className="text-center">
             <p className="text-base font-bold text-slate-100 tracking-wide">
-              {isDragging ? "Drop PDF research paper here" : "Drag & drop PDF research paper"}
+              {isDragging ? "Drop PDF research paper(s) here" : "Drag & drop PDF research paper(s)"}
             </p>
-            <p className="text-xs text-slate-400 mt-1">or <span className="text-[#A855F7] font-bold underline">browse local files</span></p>
-            <p className="text-[11px] text-white/30 mt-2">
-              Automatically triggers layout parsing, Section chunking, Gemini embeddings &amp; Napkin SVG visuals
+            <p className="text-xs text-slate-400 mt-1">or <span className="text-[#A855F7] font-bold underline">browse local files (multiple allowed)</span></p>
+            <p className="text-[11px] text-white/40 mt-2">
+              Hosted on Cloudinary CDN · Automatically triggers Section Extraction, Gemini Embeddings, Graphistry Knowledge Network &amp; Napkin Visuals
             </p>
           </div>
           <input
@@ -357,12 +390,24 @@ export default function UploadPage() {
         {/* ========================================================================= */}
         {files.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white/70 uppercase tracking-wider">Uploaded Papers Queue</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white/70 uppercase tracking-wider">Uploaded Papers Queue</h3>
+              {pendingCount > 0 && (
+                <button
+                  onClick={uploadAll}
+                  className="px-4 py-2 rounded-xl font-bold text-xs bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] hover:from-[#7C3AED] hover:to-[#C026D3] text-white flex items-center gap-1.5 shadow-lg cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Upload All ({pendingCount})</span>
+                </button>
+              )}
+            </div>
+
             {files.map((f) => (
               <div
                 key={f.id}
                 className={`flex items-center gap-4 rounded-2xl bg-[#130F26] border px-5 py-4 shadow-xl transition-all ${
-                  activePaperId === f.paperId ? "border-[#7a4aff] bg-[#1a1438]" : "border-[#271F4D]"
+                  activePaperId === f.paperId ? "border-[#7a4aff] bg-[#1a1438] ring-1 ring-[#7a4aff]/50" : "border-[#271F4D]"
                 }`}
               >
                 <div className="w-10 h-10 rounded-xl bg-[#281F54] text-[#A855F7] flex items-center justify-center shrink-0">
@@ -410,26 +455,16 @@ export default function UploadPage() {
 
                   {f.paperId && (
                     <button
-                      onClick={() => fetchVisualsForPaper(f.paperId!, f.file.name)}
-                      className="text-xs font-bold text-white bg-gradient-to-r from-[#7a4aff] to-[#d946ef] hover:from-[#6b38ef] hover:to-[#c026d3] px-3.5 py-1.5 rounded-xl shrink-0 cursor-pointer shadow-md flex items-center gap-1"
+                      onClick={() => handleSelectPaperToVisualize(f.paperId!, f.file.name)}
+                      className="text-xs font-bold text-white bg-gradient-to-r from-[#7a4aff] to-[#d946ef] hover:from-[#6b38ef] hover:to-[#c026d3] px-3.5 py-1.5 rounded-xl shrink-0 cursor-pointer shadow-md flex items-center gap-1.5"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Visualize</span>
+                      <span>{activePaperId === f.paperId ? "Viewing in Studio" : "Visualize"}</span>
                     </button>
                   )}
                 </div>
               </div>
             ))}
-
-            {pendingCount > 0 && (
-              <button
-                onClick={uploadAll}
-                className="w-full mt-6 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-[#8B5CF6] to-[#D946EF] hover:from-[#7C3AED] hover:to-[#C026D3] transition-all duration-200 shadow-lg text-white flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01]"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Upload &amp; Visualize {pendingCount} Paper{pendingCount > 1 ? "s" : ""}</span>
-              </button>
-            )}
           </div>
         )}
       </div>

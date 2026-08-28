@@ -31,12 +31,16 @@ export default function Spatial3DViewer({ paperId }: { paperId: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    async function loadData() {
+    async function loadData(retryCount = 0) {
       setLoading(true);
       try {
         const res = await fetch(`${API_BASE_URL}/papers/${paperId}/embeddings-projection`);
         if (res.ok) {
           const json = await res.json();
+          if ((!json.points || json.points.length === 0) && retryCount < 3) {
+            setTimeout(() => loadData(retryCount + 1), 2500);
+            return;
+          }
           setPoints(json.points || []);
         }
       } catch (e) {

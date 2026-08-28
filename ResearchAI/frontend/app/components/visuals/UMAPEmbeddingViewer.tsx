@@ -81,12 +81,16 @@ export default function UMAPEmbeddingViewer({ paperId }: { paperId: number }) {
   const [pitch, setPitch] = useState(20);
 
   useEffect(() => {
-    async function loadProjection() {
+    async function loadProjection(retryCount = 0) {
       setLoading(true);
       try {
         const res = await fetch(`${API_BASE_URL}/papers/${paperId}/embeddings-projection`);
         if (!res.ok) throw new Error('Failed to load embedding projection');
         const json = await res.json();
+        if ((!json.points || json.points.length === 0) && retryCount < 3) {
+          setTimeout(() => loadProjection(retryCount + 1), 2500);
+          return;
+        }
         setData(json);
       } catch (err: any) {
         setError(err.message || 'Error loading projection');
