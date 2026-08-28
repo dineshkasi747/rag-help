@@ -15,6 +15,7 @@ import {
   GraduationCap
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -28,6 +29,9 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const { theme } = useTheme();
+
+  const isDark = theme === "dark";
 
   return (
     <aside 
@@ -54,7 +58,11 @@ export default function Sidebar() {
               <ul 
                 data-slot="sidebar-menu" 
                 data-sidebar="menu" 
-                className="flex justify-center relative items-center bg-gradient-to-b from-[#a855f7] via-[#9333ea] to-[#d946ef] h-full rounded-r-3xl w-full min-w-0 flex-col gap-3.5 p-3 py-6 shadow-xl"
+                className={`flex justify-center relative items-center h-full rounded-r-3xl w-full min-w-0 flex-col gap-3.5 p-3 py-6 transition-all duration-300 ${
+                  isDark
+                    ? "bg-gradient-to-b from-[#a855f7] via-[#9333ea] to-[#d946ef] shadow-xl"
+                    : "bg-white/95 border-r border-y border-slate-200/90 shadow-md"
+                }`}
               >
                 {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
                   const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
@@ -68,40 +76,53 @@ export default function Sidebar() {
                         data-active={active ? "true" : "false"}
                         className={`
                           peer/menu-button flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl p-3 text-left transition-all duration-200 cursor-pointer
-                          ${active
-                            ? "bg-white/20 text-white font-medium border border-white/30 shadow-lg scale-105"
-                            : "text-white/80 hover:text-white hover:bg-white/10 hover:border-white/20 border border-transparent hover:scale-105"
+                          ${
+                            isDark
+                              ? active
+                                ? "bg-white/20 text-white font-medium border border-white/30 shadow-lg scale-105"
+                                : "text-white/80 hover:text-white hover:bg-white/10 hover:border-white/20 border border-transparent hover:scale-105"
+                              : active
+                                ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-medium shadow-md shadow-violet-500/25 scale-105"
+                                : "text-slate-500 hover:text-violet-600 hover:bg-violet-50 border border-transparent hover:scale-105"
                           }
                         `}
                       >
-                        <Icon className="w-5 h-5 shrink-0 text-white" />
+                        <Icon className={`w-5 h-5 shrink-0 ${isDark || active ? "text-white" : "text-slate-600"}`} />
                       </Link>
                     </li>
                   );
                 })}
 
-                <li data-slot="sidebar-menu-item" className="group/menu-item relative pt-2 border-t border-white/20">
+                <li data-slot="sidebar-menu-item" className={`group/menu-item relative pt-2 border-t ${
+                  isDark ? "border-white/20" : "border-slate-200"
+                }`}>
                   <button
                     onClick={logout}
                     title="Sign Out"
-                    className="flex w-full items-center justify-center p-3 rounded-xl text-white/70 hover:text-red-200 hover:bg-white/10 transition-all cursor-pointer"
+                    className={`flex w-full items-center justify-center p-3 rounded-xl transition-all cursor-pointer ${
+                      isDark
+                        ? "text-white/70 hover:text-red-200 hover:bg-white/10"
+                        : "text-slate-400 hover:text-red-600 hover:bg-red-50"
+                    }`}
                   >
                     <LogOut className="w-5 h-5 shrink-0" />
                   </button>
                 </li>
               </ul>
 
-              {/* SVG Curved Corner Accents from Template */}
-              <div className="absolute hidden xl:block w-full h-full top-0 left-0 pointer-events-none">
-                <svg className="absolute left-0 bottom-[-30px] svg-corner svg-pink" width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <g clipPath="url(#clip0_310_2)"><path d="M30 0H0V30C0 13.431 13.431 0 30 0Z"></path></g>
-                  <defs><clipPath id="clip0_310_2"><rect width="30" height="30" fill="white"></rect></clipPath></defs>
-                </svg>
-                <svg className="absolute left-0 top-[-30px] -rotate-90 svg-corner" width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <g clipPath="url(#clip0_310_3)"><path d="M30 0H0V30C0 13.431 13.431 0 30 0Z"></path></g>
-                  <defs><clipPath id="clip0_310_3"><rect width="30" height="30" fill="white"></rect></clipPath></defs>
-                </svg>
-              </div>
+              {/* SVG Curved Corner Accents in Dark Mode */}
+              {isDark && (
+                <div className="absolute hidden xl:block w-full h-full top-0 left-0 pointer-events-none">
+                  <svg className="absolute left-0 bottom-[-30px] svg-corner svg-pink" width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g clipPath="url(#clip0_310_2)"><path d="M30 0H0V30C0 13.431 13.431 0 30 0Z"></path></g>
+                    <defs><clipPath id="clip0_310_2"><rect width="30" height="30" fill="white"></rect></clipPath></defs>
+                  </svg>
+                  <svg className="absolute left-0 top-[-30px] -rotate-90 svg-corner" width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g clipPath="url(#clip0_310_3)"><path d="M30 0H0V30C0 13.431 13.431 0 30 0Z"></path></g>
+                    <defs><clipPath id="clip0_310_3"><rect width="30" height="30" fill="white"></rect></clipPath></defs>
+                  </svg>
+                </div>
+              )}
             </div>
           </div>
         </div>
