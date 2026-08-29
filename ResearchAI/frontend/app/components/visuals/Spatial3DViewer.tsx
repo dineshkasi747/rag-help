@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { API_URL as API_BASE_URL } from '../../config';
+import MathMarkdownRenderer from '../MathMarkdownRenderer';
 
 interface Point3D {
   id: string;
@@ -639,9 +640,7 @@ export default function Spatial3DViewer({ paperId }: { paperId: number }) {
                       <Zap className="w-4 h-4 text-cyan-400" />
                       <span>Synthesized AI Answer</span>
                     </div>
-                    <div className="whitespace-pre-wrap leading-relaxed text-[11.5px] text-slate-200 font-normal">
-                      {queryResult.ai_answer}
-                    </div>
+                    <MathMarkdownRenderer content={queryResult.ai_answer} className="text-[11.5px]" />
                   </div>
                 )}
 

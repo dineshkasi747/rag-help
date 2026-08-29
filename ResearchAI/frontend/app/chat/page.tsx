@@ -32,6 +32,8 @@ import {
 
 import { API_URL as API } from "../config";
 
+import MathMarkdownRenderer from "../components/MathMarkdownRenderer";
+
 interface Citation {
   section_type: string;
   page_number?: number;
@@ -72,72 +74,6 @@ const MULTI_PAPER_PRESETS = [
   "Summarize key insights and practical implications for AI engineers"
 ];
 
-// Clean formatting helper for Markdown headings, bullet points, and bold text
-function FormattedAssistantMessage({ content }: { content: string }) {
-  if (!content) return null;
-
-  const lines = content.split("\n");
-  return (
-    <div className="space-y-2 text-sm leading-relaxed">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
-        if (!trimmed) return <div key={idx} className="h-1.5" />;
-
-        // H3 heading (### Heading)
-        if (trimmed.startsWith("### ")) {
-          return (
-            <h4 key={idx} className="text-sm font-extrabold text-cyan-400 dark:text-cyan-300 pt-2 pb-0.5 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-violet-400" />
-              <span>{trimmed.replace(/^###\s+/, "")}</span>
-            </h4>
-          );
-        }
-
-        // H2 heading (## Heading)
-        if (trimmed.startsWith("## ")) {
-          return (
-            <h3 key={idx} className="text-base font-black text-violet-400 dark:text-violet-300 pt-2.5 pb-1">
-              {trimmed.replace(/^##\s+/, "")}
-            </h3>
-          );
-        }
-
-        // Bullet list item (- Item or * Item)
-        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-          const itemText = trimmed.replace(/^[-*]\s+/, "");
-          // Bold formatting within bullets
-          const parts = itemText.split(/(\*\*.*?\*\*)/g);
-          return (
-            <div key={idx} className="flex items-start gap-2 pl-1 py-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-violet-400 mt-2 shrink-0" />
-              <span className="flex-1">
-                {parts.map((p, pIdx) => {
-                  if (p.startsWith("**") && p.endsWith("**")) {
-                    return <strong key={pIdx} className="font-bold text-white dark:text-white text-slate-900">{p.slice(2, -2)}</strong>;
-                  }
-                  return p;
-                })}
-              </span>
-            </div>
-          );
-        }
-
-        // Standard paragraph line with bold rendering
-        const parts = line.split(/(\*\*.*?\*\*)/g);
-        return (
-          <p key={idx}>
-            {parts.map((p, pIdx) => {
-              if (p.startsWith("**") && p.endsWith("**")) {
-                return <strong key={pIdx} className="font-bold text-white dark:text-white text-slate-900">{p.slice(2, -2)}</strong>;
-              }
-              return p;
-            })}
-          </p>
-        );
-      })}
-    </div>
-  );
-}
 
 export default function ChatPage() {
   const { user } = useAuth();
@@ -694,9 +630,9 @@ export default function ChatPage() {
                       </div>
                     )}
 
-                    {/* Assistant Message Content (Formatted Markdown) or User plain text */}
+                    {/* Assistant Message Content (LaTeX Math & Formatted Markdown) or User text */}
                     {msg.role === "assistant" ? (
-                      <FormattedAssistantMessage content={msg.content} />
+                      <MathMarkdownRenderer content={msg.content} />
                     ) : (
                       <div className="whitespace-pre-wrap leading-relaxed text-sm">{msg.content}</div>
                     )}

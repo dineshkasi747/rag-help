@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { API_URL as API_BASE_URL } from '../../config';
+import MathMarkdownRenderer from '../MathMarkdownRenderer';
 
 interface GraphNode extends d3.SimulationNodeDatum {
   id: string;
@@ -470,7 +471,7 @@ export default function GraphistryKnowledgeGraph({ paperId }: { paperId: number 
                     Detailed Explanation:
                   </span>
                   <div className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800/80 text-slate-200 leading-relaxed text-[11.5px] font-normal shadow-sm">
-                    {selectedNode.description}
+                    <MathMarkdownRenderer content={selectedNode.description} className="text-[11.5px]" />
                   </div>
                 </div>
 
@@ -481,8 +482,8 @@ export default function GraphistryKnowledgeGraph({ paperId }: { paperId: number 
                       <Cpu className="w-3.5 h-3.5 text-cyan-400" />
                       Technical &amp; Mathematical Mechanics:
                     </span>
-                    <div className="p-3 rounded-2xl bg-cyan-950/20 border border-cyan-500/20 text-cyan-200 leading-relaxed text-[11px] font-mono">
-                      {selectedNode.technical_details}
+                    <div className="p-3 rounded-2xl bg-cyan-950/20 border border-cyan-500/20 text-cyan-200 leading-relaxed text-[11px]">
+                      <MathMarkdownRenderer content={selectedNode.technical_details} className="text-[11px]" />
                     </div>
                   </div>
                 )}
@@ -533,8 +534,20 @@ export default function GraphistryKnowledgeGraph({ paperId }: { paperId: number 
                     </div>
 
                     <div className="space-y-2 text-[11px] text-slate-300 leading-relaxed">
-                      <p><strong className="text-white">Role in Methodology:</strong> {deepDiveData.role_in_methodology}</p>
-                      <p><strong className="text-white">Empirical Impact:</strong> {deepDiveData.empirical_impact_and_results}</p>
+                      <div>
+                        <strong className="text-white block mb-0.5">Role in Methodology:</strong>
+                        <MathMarkdownRenderer content={deepDiveData.role_in_methodology} className="text-[11px]" />
+                      </div>
+                      {deepDiveData.mathematical_and_architectural_formulation && (
+                        <div>
+                          <strong className="text-white block mb-0.5">Mathematical &amp; Architectural Formulation:</strong>
+                          <MathMarkdownRenderer content={deepDiveData.mathematical_and_architectural_formulation} className="text-[11px]" />
+                        </div>
+                      )}
+                      <div>
+                        <strong className="text-white block mb-0.5">Empirical Impact:</strong>
+                        <MathMarkdownRenderer content={deepDiveData.empirical_impact_and_results} className="text-[11px]" />
+                      </div>
                     </div>
 
                     {deepDiveData.key_takeaways && deepDiveData.key_takeaways.length > 0 && (
